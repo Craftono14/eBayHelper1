@@ -1,0 +1,236 @@
+// Prisma schema for eBay Tracking App
+// Database: PostgreSQL (update provider if using different DB)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - Stores user authentication and eBay OAuth credentials
+model User {
+  id                      Int            @id @default(autoincrement())
+  discordId               String?        @unique // Discord user ID (optional for email/password users)
+  username                String?        // Discord username
+  // Local authentication
+  email                   String?        @unique
+  passwordHash            String?
+  
+  // eBay OAuth credentials
+  ebayUserId              String?        // eBay user ID
+  ebayAccessToken         String?        // eBay access token
+  ebayRefreshToken        String?        // eBay refresh token
+  ebayTokenExpiry         DateTime?      // Token expiration time
+  
+  // Relationships
+  savedSearches           SavedSearch[]  @relation("UserSavedSearches")
+  wishlistItems           WishlistItem[] @relation("UserWishlistItems")
+  itemHistories           ItemHistory[]  @relation("UserItemHistories")
+  
+  // Account deletion compliance (GDPR/eBay policy)
+  deletedAt               DateTime?      // Soft delete timestamp for compliance
+  
+  // Metadata
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  lastSyncedAt            DateTime?      // Last time searches were synced with eBay
+  
+  @@index([discordId])
+  @@map("users")
+}
+
+// SavedSearch model - Stores saved eBay search filters
+model SavedSearch {
+  id                      Int            @id @default(autoincrement())
+  userId                  Int
+  user                    User           @relation("UserSavedSearches", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Search configuration
+  name                    String         // User-defined name for this search
+  searchKeywords          String         // Search query string
+  searchQuery             String?        // eBay saved search URL (from SearchQuery field)
+  buyingFormat            String?        // "Buy It Now", "Auction", "Both"
+  categories              String?        // JSON array of eBay category IDs
+  
+  // Price filters
+  minPrice                Decimal?       @db.Decimal(10, 2)
+  maxPrice                Decimal?       @db.Decimal(10, 2)
+  currency                String?        // Currency filter (e.g., "USD", "GBP")
+  
+  // Sorting
+  sortBy                  String?        // Sort field (e.g., "BestMatch", "EndTimeSoonest", "PricePlusShippingLowest")
+  sortOrder               String?        // "Ascending" or "Descending"
+  
+  // Item condition
+  condition               String?        // "New", "Refurbished", "Used", "For parts or not working"
+  
+  // Location filters
+  itemLocation            String?        // US, UK, etc.
+  zipCode                 String?        // Seller's zip code
+  
+  // Seller criteria filters
+  authorizedSeller        Boolean        @default(false)
+  completedItems          Boolean        @default(false)
+  soldItems               Boolean        @default(false)
+  
+  // Return & shipping filters
+  freeReturns             Boolean        @default(false)
+  returnsAccepted         Boolean        @default(false)
+  freeShipping            Boolean        @default(false)
+  localPickup             Boolean        @default(false)
+  arrivesIn24Days         Boolean        @default(false)
+  
+  // Item type/condition filters
+  dealsAndSavings         Boolean        @default(false)
+  saleItems               Boolean        @default(false)
+  listedAsLots            Boolean        @default(false)
+  searchInDescription     Boolean        @default(false)
+  
+  // Special items filters
+  benefitsCharity         Boolean        @default(false)
+  psaVault                Boolean        @default(false)
+  
+  // Global sites to search
+  targetGlobalSites       String?        // JSON array of eBay site codes (e.g., ["EBAY-US", "EBAY-GB"])
+  
+  // Notification settings
+  notifyOnNewItems        Boolean        @default(true)
+  notifyOnPriceDrop       Boolean        @default(true)
+  maxNotificationsPerDay  Int            @default(5)
+  
+  // Metadata
+  isActive                Boolean        @default(true)
+  isEbayImported          Boolean        @default(false) // True if imported from eBay saved searches
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  lastRunAt               DateTime?      // Last time this search was executed
+  ebaySearchId            String?        @unique // ID of the saved search in eBay (if imported)
+  lastSyncedAt            DateTime?      // Last time this saved search was synced with eBay
+  
+  // Relationships
+  wishlistItems           WishlistItem[] @relation("SearchWishlistItems")
+  
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([isActive])
+  @@map("saved_searches")
+}
+
+// WishlistItem model - Tracks individual items user is interested in
+model WishlistItem {
+  id                      Int            @id @default(autoincrement())
+  userId                  Int
+  user                    User           @relation("UserWishlistItems", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Item identification
+  isEbayImported          Boolean        @default(false) // True if imported from eBay watchlist
+  ebayItemId              String?        // eBay item ID (null for local-only items)
+  itemTitle               String?        // Item name/title
+  itemUrl                 String?        // Direct link to eBay listing
+  
+  // Search association (optional - item could come from multiple searches)
+  searchId                Int?
+  search                  SavedSearch?   @relation("SearchWishlistItems", fields: [searchId], references: [id], onDelete: SetNull)
+  
+  // Price tracking
+  currentPrice            Decimal?       @db.Decimal(10, 2)
+  targetPrice             Decimal        @db.Decimal(10, 2) // Price user wants to buy at
+  lowestPriceRecorded     Decimal?       @db.Decimal(10, 2)
+  highestPriceRecorded    Decimal?       @db.Decimal(10, 2)
+  
+  // Seller info
+  seller                  String?        // eBay seller username
+  sellerRating            Int?           // Seller's feedback score
+  
+  // Item status
+  isActive                Boolean        @default(true)
+  isWon                   Boolean        @default(false)
+  isPurchased             Boolean        @default(false)
+  
+  // Metadata
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  lastCheckedAt           DateTime?      // Last time price was checked
+  
+  // Relationships
+  priceHistory            ItemHistory[]  @relation("WishlistPriceHistory")
+  
+  @@unique([userId, ebayItemId])
+  @@index([userId])
+  @@index([isActive])
+  @@index([targetPrice])
+  @@map("wishlist_items")
+}
+
+// ItemHistory model - Tracks price changes and historical data
+model ItemHistory {
+  id                      Int            @id @default(autoincrement())
+  userId                  Int
+  user                    User           @relation("UserItemHistories", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Item reference
+  wishlistItemId          Int            // Which wishlist item this history belongs to
+  wishlistItem            WishlistItem   @relation("WishlistPriceHistory", fields: [wishlistItemId], references: [id], onDelete: Cascade)
+  
+  // Price data
+  price                   Decimal        @db.Decimal(10, 2)
+  priceDropped            Boolean        @default(false) // Did price drop from previous?
+  priceDropAmount         Decimal?       @db.Decimal(10, 2) // Absolute drop amount
+  
+  // Quantity/availability
+  quantityAvailable       Int?           // Number of items available
+  quantitySold            Int?           // Cumulative sold count (for auctions)
+  
+  // Auction-specific data (if applicable)
+  currentBid              Decimal?       @db.Decimal(10, 2)
+  numberOfBids            Int?
+  auctionEndsAt           DateTime?
+  
+  // Shipping data
+  shippingCost            Decimal?       @db.Decimal(10, 2)
+  handlingCost            Decimal?       @db.Decimal(10, 2)
+  shippingMethod          String?        // e.g., "Standard", "Expedited"
+  
+  // Metadata
+  recordedAt              DateTime       @default(now())
+  
+  @@index([userId])
+  @@index([wishlistItemId])
+  @@index([recordedAt])
+  @@index([priceDropped])
+  @@map("item_histories")
+}
+
+// Enums for common values (optional but recommended)
+enum BuyingFormat {
+  BUY_IT_NOW        @map("Buy It Now")
+  AUCTION           @map("Auction")
+  BOTH              @map("Both")
+}
+
+enum ItemCondition {
+  NEW               @map("New")
+  REFURBISHED       @map("Refurbished")
+  USED              @map("Used")
+  FOR_PARTS         @map("For parts or not working")
+}
+
+// EbayAccountDeletion model - Tracks eBay account deletion/closure notifications for compliance
+model EbayAccountDeletion {
+  id                      Int            @id @default(autoincrement())
+  ebayUserId              String         @unique // eBay user ID from notification
+  deletionReason          String         // USER_REQUESTED, ACCOUNT_SUSPENDED, ACCOUNT_CLOSED
+  deletionDate            DateTime       // When the deletion/closure occurred
+  notificationId          String         @unique // eBay notification ID for tracking
+  processedAt             DateTime       @default(now()) // When we processed the notification
+  
+  // Metadata for compliance logging
+  createdAt               DateTime       @default(now())
+  
+  @@index([ebayUserId])
+  @@index([processedAt])
+  @@map("ebay_account_deletions")
+}
