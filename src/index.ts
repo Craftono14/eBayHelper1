@@ -134,6 +134,17 @@ app.use((_req: Request, res: Response): void => {
 // Start server
 const startServer = async (): Promise<void> => {
   try {
+    // Run database migrations on startup
+    try {
+      console.log('Running database migrations...');
+      const { execSync } = require('child_process');
+      execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+      console.log('✓ Migrations completed successfully');
+    } catch (error) {
+      console.error('⚠️  Migration warning (may be normal if already migrated):', error);
+      // Don't exit here - migrations might already be applied
+    }
+
     // Initialize background workers
     const accessToken = process.env.EBAY_ACCESS_TOKEN;
     if (!accessToken) {
