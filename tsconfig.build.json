@@ -10,17 +10,12 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
+    "declaration": false,
     "sourceMap": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "types": ["node"],
-    "typeRoots": ["./node_modules/@types"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "types": []
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "frontend", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "frontend"]
 }
