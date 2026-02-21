@@ -22,7 +22,7 @@ dotenv.config();
 
 // Initialize Express app
 const app: Express = express();
-const port = parseInt(process.env.PORT || '3000', 10);
+const port: number = parseInt(process.env.PORT || '3000', 10);
 
 // Initialize Prisma Client
 const prisma = new PrismaClient();
