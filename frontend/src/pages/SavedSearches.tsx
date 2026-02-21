@@ -28,7 +28,12 @@ export const SavedSearches: React.FC = () => {
     const fetchSearches = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/searches/dashboard');
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/searches/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         if (!response.ok) throw new Error('Failed to fetch searches');
         const data = await response.json();
         setSearches(data.searches || []);

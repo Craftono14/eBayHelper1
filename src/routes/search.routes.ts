@@ -255,9 +255,9 @@ router.post('/check-prices', async (req: Request, res: Response): Promise<void> 
  * GET /api/search/wishlist
  * Get all wishlist items for user
  */
-router.get('/wishlist', async (req: Request, res: Response): Promise<void> => {
+router.get('/wishlist', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id;
     const filter = req.query.filter || 'active'; // active, won, purchased, all
 
     const whereClause =
@@ -313,9 +313,9 @@ router.get('/wishlist', async (req: Request, res: Response): Promise<void> => {
  * POST /api/search/wishlist
  * Add item to wishlist
  */
-router.post('/wishlist', async (req: Request, res: Response): Promise<void> => {
+router.post('/wishlist', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id;
     const { ebayItemId, itemTitle, itemUrl, targetPrice } = req.body;
 
     if (!ebayItemId) {

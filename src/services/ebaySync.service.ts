@@ -312,9 +312,16 @@ export class EbaySyncService {
         ? 'https://api.sandbox.ebay.com/ws/api.dll'
         : 'https://api.ebay.com/ws/api.dll';
 
-      // Build XML request for GetMyeBayBuying
-      // Request only WatchList section with detailed information
-      const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
+      // Fetch all watchlist items with pagination
+      let watchlistItems: EbayWatchlistItem[] = [];
+      let currentPage = 1;
+      let hasMorePages = true;
+      const entriesPerPage = 200;
+
+      try {
+        while (hasMorePages) {
+          // Build XML request for current page
+          const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBayBuyingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
     <eBayAuthToken>${user.ebayAccessToken}</eBayAuthToken>
@@ -322,32 +329,43 @@ export class EbaySyncService {
   <WatchList>
     <Include>true</Include>
     <Pagination>
-      <EntriesPerPage>200</EntriesPerPage>
-      <PageNumber>1</PageNumber>
+      <EntriesPerPage>${entriesPerPage}</EntriesPerPage>
+      <PageNumber>${currentPage}</PageNumber>
     </Pagination>
   </WatchList>
   <DetailLevel>ReturnAll</DetailLevel>
 </GetMyeBayBuyingRequest>`;
 
-      let watchlistItems: EbayWatchlistItem[] = [];
+          console.log(`[EbaySyncService] Fetching watchlist page ${currentPage}...`);
 
-      try {
-        // Make Trading API call
-        const response = await axios.post(apiUrl, xmlRequest, {
-          headers: {
-            'X-EBAY-API-SITEID': '0', // 0 = US
-            'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
-            'X-EBAY-API-CALL-NAME': 'GetMyeBayBuying',
-            'Content-Type': 'text/xml',
-          },
-        });
+          // Make Trading API call
+          const response = await axios.post(apiUrl, xmlRequest, {
+            headers: {
+              'X-EBAY-API-SITEID': '0', // 0 = US
+              'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+              'X-EBAY-API-CALL-NAME': 'GetMyeBayBuying',
+              'Content-Type': 'text/xml',
+            },
+          });
+          
+          // Parse XML response
+          const pageItems = this.parseWatchlistXML(response.data);
+          console.log(`[EbaySyncService] Page ${currentPage}: Found ${pageItems.length} items`);
+          
+          watchlistItems.push(...pageItems);
+          
+          // Check if there are more pages
+          const totalPages = this.extractTotalPagesFromXML(response.data);
+          console.log(`[EbaySyncService] Total pages: ${totalPages}, Current page: ${currentPage}`);
+          
+          if (currentPage >= totalPages || pageItems.length < entriesPerPage) {
+            hasMorePages = false;
+          } else {
+            currentPage++;
+          }
+        }
 
-        console.log('[EbaySyncService] Full eBay response:', response.data);
-        console.log('[EbaySyncService] Response length:', response.data.length);
-        
-        // Parse XML response
-        watchlistItems = this.parseWatchlistXML(response.data);
-        console.log('[EbaySyncService] Parsed watchlist items:', watchlistItems.length);
+        console.log(`[EbaySyncService] Total watchlist items fetched: ${watchlistItems.length}`);
       } catch (error: any) {
         // Handle 401 - attempt token refresh
         if (error.response?.status === 401 && user.ebayRefreshToken) {
@@ -357,8 +375,13 @@ export class EbaySyncService {
             const newTokens = await refreshAccessToken(user.ebayRefreshToken, ebayConfig);
             await this.updateUserTokens(userId, newTokens);
 
-            // Retry with new token
-            const retryXmlRequest = `<?xml version="1.0" encoding="utf-8"?>
+            // Retry with new token - fetch all pages
+            watchlistItems = [];
+            currentPage = 1;
+            hasMorePages = true;
+
+            while (hasMorePages) {
+              const retryXmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBayBuyingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
     <eBayAuthToken>${newTokens.accessToken}</eBayAuthToken>
@@ -366,23 +389,32 @@ export class EbaySyncService {
   <WatchList>
     <Include>true</Include>
     <Pagination>
-      <EntriesPerPage>200</EntriesPerPage>
-      <PageNumber>1</PageNumber>
+      <EntriesPerPage>${entriesPerPage}</EntriesPerPage>
+      <PageNumber>${currentPage}</PageNumber>
     </Pagination>
   </WatchList>
   <DetailLevel>ReturnAll</DetailLevel>
 </GetMyeBayBuyingRequest>`;
 
-            const retryResponse = await axios.post(apiUrl, retryXmlRequest, {
-              headers: {
-                'X-EBAY-API-SITEID': '0',
-                'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
-                'X-EBAY-API-CALL-NAME': 'GetMyeBayBuying',
-                'Content-Type': 'text/xml',
-              },
-            });
+              const retryResponse = await axios.post(apiUrl, retryXmlRequest, {
+                headers: {
+                  'X-EBAY-API-SITEID': '0',
+                  'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+                  'X-EBAY-API-CALL-NAME': 'GetMyeBayBuying',
+                  'Content-Type': 'text/xml',
+                },
+              });
 
-            watchlistItems = this.parseWatchlistXML(retryResponse.data);
+              const pageItems = this.parseWatchlistXML(retryResponse.data);
+              watchlistItems.push(...pageItems);
+
+              const totalPages = this.extractTotalPagesFromXML(retryResponse.data);
+              if (currentPage >= totalPages || pageItems.length < entriesPerPage) {
+                hasMorePages = false;
+              } else {
+                currentPage++;
+              }
+            }
           } catch (refreshError: any) {
             console.error('[EbaySyncService] Token refresh failed:', refreshError.message);
             throw new Error('Token refresh failed and watchlist sync was unauthorized');
@@ -514,6 +546,36 @@ export class EbaySyncService {
     }
 
     return items;
+  }
+
+  /**
+   * Extract total number of pages from WatchList pagination info
+   */
+  private extractTotalPagesFromXML(xmlData: string): number {
+    try {
+      // Extract the WatchList section first
+      const watchListRegex = /<WatchList>([\s\S]*?)<\/WatchList>/;
+      const watchListMatch = xmlData.match(watchListRegex);
+      
+      if (!watchListMatch) {
+        return 1;
+      }
+
+      const watchListXml = watchListMatch[1];
+      
+      // Try to find TotalNumberOfPages in PaginationResult
+      const totalPagesValue = this.extractXmlValue(watchListXml, 'PaginationResult', 'TotalNumberOfPages');
+      
+      if (totalPagesValue) {
+        const pages = parseInt(totalPagesValue);
+        return isNaN(pages) ? 1 : pages;
+      }
+      
+      return 1;
+    } catch (error: any) {
+      console.error('[EbaySyncService] Error extracting total pages:', error.message);
+      return 1;
+    }
   }
 
   /**
