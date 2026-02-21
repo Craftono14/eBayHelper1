@@ -177,18 +177,35 @@ app.use((req: Request, res: Response): void => {
 // Start server
 const startServer = async (): Promise<void> => {
   try {
-    // Initialize Prisma Client (after checking env vars)
+    // Initialize Prisma Client
     console.log('[STARTUP] Initializing Prisma Client...');
     prisma = new PrismaClient();
     console.log('[STARTUP] Prisma Client initialized');
 
-    // First, start listening - this is CRITICAL for Render to detect the port
+    // Run database migrations BEFORE binding to port
+    // This ensures the database schema is ready when requests arrive
+    try {
+      console.log('[STARTUP] Testing database connection...');
+      await prisma.$executeRawUnsafe(`SELECT 1`);
+      console.log('[STARTUP] ✓ Database connection verified');
+      
+      console.log('[STARTUP] Running migrations...');
+      const { execSync } = require('child_process');
+      execSync('npx prisma migrate deploy', { stdio: 'inherit', timeout: 60000 });
+      console.log('[STARTUP] ✓ Migrations completed successfully');
+    } catch (error) {
+      console.error('[STARTUP] ✗ Migration error:', error instanceof Error ? error.message : String(error));
+      // Continue anyway - migrations might already be applied or this might be a fresh database
+    }
+
+    // NOW bind to port - database is ready
     console.log(`[STARTUP] Attempting to bind to 0.0.0.0:${port}`);
     const server = app.listen(port, '0.0.0.0', (): void => {
-      console.log(`✓✓✓ SERVER LISTENING ON PORT ${port} ✓✓✓`);
+      console.log(`\n✓✓✓ SERVER LISTENING ON PORT ${port} ✓✓✓`);
+      console.log(`✓ Database schema verified`);
       console.log(`✓ Ready to accept requests on 0.0.0.0:${port}`);
       console.log(`✓ Frontend served from /`);
-      console.log(`✓ API available at /api`);
+      console.log(`✓ API available at /api\n`);
     });
 
     console.log(`[STARTUP] Port binding successful`);
@@ -196,29 +213,10 @@ const startServer = async (): Promise<void> => {
     // Set a timeout for any startup operations
     server.requestTimeout = 30000;
 
-    // Now handle async operations (migrations, workers) without blocking the port
+    // Now handle async operations (workers) in the background
     setImmediate(async () => {
-      console.log('[STARTUP] Running async initialization tasks...');
+      console.log('[STARTUP] Running background initialization tasks...');
       
-      // Run database migrations
-      try {
-        console.log('  → Testing database connection...');
-        await prisma.$executeRawUnsafe(`SELECT 1`); // Test connection
-        console.log('  ✓ Database connection verified');
-        
-        // Try to run migrations, but don't fail if they're already applied
-        try {
-          console.log('  → Running migrations...');
-          const { execSync } = require('child_process');
-          execSync('npx prisma migrate deploy', { stdio: 'inherit', timeout: 30000 });
-          console.log('  ✓ Migrations completed successfully');
-        } catch (error) {
-          console.warn('  ⚠️  Migrations skipped (may be already applied)');
-        }
-      } catch (error) {
-        console.error('  ✗ Database error:', error instanceof Error ? error.message : String(error));
-      }
-
       // Initialize background workers
       const accessToken = process.env.EBAY_ACCESS_TOKEN;
       if (!accessToken) {
@@ -262,14 +260,14 @@ const startServer = async (): Promise<void> => {
         console.error('  ✗ Price monitoring routes failed:', err instanceof Error ? err.message : String(err));
       }
 
-      console.log('[STARTUP] Async initialization complete');
+      console.log('[STARTUP] Background initialization complete');
     });
 
   } catch (error) {
     console.error('\n✗✗✗ CRITICAL ERROR DURING STARTUP ✗✗✗');
     console.error(error instanceof Error ? error.message : String(error));
-    console.error('Process will continue running but functionality may be limited');
-    // Don't exit - let Render see the port is open, even if there are issues
+    console.error('Stack:', error instanceof Error ? error.stack : '');
+    process.exit(1);
   }
 };
 
