@@ -182,27 +182,10 @@ const startServer = async (): Promise<void> => {
     prisma = new PrismaClient();
     console.log('[STARTUP] Prisma Client initialized');
 
-    // Run database migrations BEFORE binding to port
-    // This ensures the database schema is ready when requests arrive
-    try {
-      console.log('[STARTUP] Testing database connection...');
-      await prisma.$executeRawUnsafe(`SELECT 1`);
-      console.log('[STARTUP] ✓ Database connection verified');
-      
-      console.log('[STARTUP] Running migrations...');
-      const { execSync } = require('child_process');
-      execSync('npx prisma migrate deploy', { stdio: 'inherit', timeout: 60000 });
-      console.log('[STARTUP] ✓ Migrations completed successfully');
-    } catch (error) {
-      console.error('[STARTUP] ✗ Migration error:', error instanceof Error ? error.message : String(error));
-      // Continue anyway - migrations might already be applied or this might be a fresh database
-    }
-
-    // NOW bind to port - database is ready
+    // Bind to port immediately - migrations should have already run via preDeployCommand
     console.log(`[STARTUP] Attempting to bind to 0.0.0.0:${port}`);
     const server = app.listen(port, '0.0.0.0', (): void => {
       console.log(`\n✓✓✓ SERVER LISTENING ON PORT ${port} ✓✓✓`);
-      console.log(`✓ Database schema verified`);
       console.log(`✓ Ready to accept requests on 0.0.0.0:${port}`);
       console.log(`✓ Frontend served from /`);
       console.log(`✓ API available at /api\n`);
@@ -213,7 +196,7 @@ const startServer = async (): Promise<void> => {
     // Set a timeout for any startup operations
     server.requestTimeout = 30000;
 
-    // Now handle async operations (workers) in the background
+    // Initialize background workers asynchronously
     setImmediate(async () => {
       console.log('[STARTUP] Running background initialization tasks...');
       
