@@ -58,6 +58,8 @@
     "prisma": "^5.9.1",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vite": "^5.4.1"
+  
   }
 }
