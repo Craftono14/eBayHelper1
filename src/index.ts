@@ -145,15 +145,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction): void =>
 });
 
 // Catch any unhandled eBay-related routes before 404
-app.all('*ebay - serve index.html for SPA routing
-app.use((_req: Request, res: Response): void => {
-  // If it's not an API route and frontend is built, serve index.html for SPA routing
-  const indexPath = path.join(frontendPath, 'index.html');
-  try {
-    res.sendFile(indexPath);
-  } catch {
-    res.status(404).json({ error: 'Not Found', message: `Route ${_req.path} not found` });
-  }
+app.all('*ebay*', (req: Request, _res: Response, next: NextFunction): void => {
+  console.log('[DEBUG] Unmatched eBay route:', {
+    method: req.method,
     path: req.path,
     url: req.url,
     query: req.query,
@@ -161,14 +155,31 @@ app.use((_req: Request, res: Response): void => {
   next();
 });
 
-// 404 handler
-app.use((_req: Request, res: Response): void => {
-  res.status(404).json({ error: 'Not Found', message: `Route ${_req.path} not found` });
+// 404 handler - serve SPA for non-API routes
+app.use((req: Request, res: Response): void => {
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ error: 'Not Found', message: `Route ${req.path} not found` });
+    return;
+  }
+
+  const indexPath = path.join(frontendPath, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      res.status(404).json({ error: 'Not Found', message: `Route ${req.path} not found` });
+    }
+  });
 });
 
 // Start server
 const startServer = async (): Promise<void> => {
   try {
+    app.listen(port, '0.0.0.0', (): void => {
+      console.log(`✓ Server is running on port ${port}`);
+      console.log(`✓ OAuth routes available at /api/oauth`);
+      console.log(`✓ Search routes available at /api/search`);
+      console.log(`✓ Worker routes available at /api/workers`);
+    });
+
     // Run database migrations on startup
     try {
       console.log('Running database migrations...');
@@ -218,12 +229,6 @@ const startServer = async (): Promise<void> => {
       }
     }
 
-    app.listen(port, '0.0.0.0', (): void => {
-      console.log(`✓ Server is running on port ${port}`);
-      console.log(`✓ OAuth routes available at /api/oauth`);
-      console.log(`✓ Search routes available at /api/search`);
-      console.log(`✓ Worker routes available at /api/workers`);
-    });
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
