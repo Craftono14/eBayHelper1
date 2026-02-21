@@ -72,6 +72,24 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
+// Root endpoint
+app.get('/', (_req: Request, res: Response): void => {
+  res.json({
+    message: 'Welcome to eBay Helper API',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      auth: '/api/auth',
+      oauth: '/api/oauth',
+      search: '/api/search',
+      searches: '/api/searches',
+      ebay: '/api/ebay',
+      prices: '/api/prices',
+    },
+  });
+});
+
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response): void => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
