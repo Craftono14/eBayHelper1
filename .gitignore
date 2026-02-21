@@ -28,7 +28,6 @@ logs/
 *.log
 
 # Prisma
-prisma/migrations/
 .prisma/
 
 # Testing
