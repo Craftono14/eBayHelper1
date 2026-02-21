@@ -28,8 +28,6 @@
   "dependencies": {
     "@prisma/client": "^5.9.1",
     "@types/xml2js": "^0.4.14",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "axios": "^1.13.5",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.69.2",
@@ -60,8 +58,7 @@
     "prisma": "^5.9.1",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3",
-    "vite": "^5.4.1"
+    "typescript": "^5.3.3"
   
   }
 }
