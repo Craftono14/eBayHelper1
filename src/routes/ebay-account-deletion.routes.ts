@@ -99,10 +99,16 @@ router.get('/notification', (req: Request, res: Response): void => {
  */
 router.post('/notification', async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('[eBay Account Deletion] POST notification received');
+    console.log('[eBay Account Deletion] Request headers:', req.headers);
+    console.log('[eBay Account Deletion] Request body:', JSON.stringify(req.body, null, 2));
+
     const { metadata, notification } = req.body;
 
     if (!metadata || !notification) {
-      res.status(400).json({ error: 'Invalid notification payload' });
+      console.error('[eBay Account Deletion] Missing metadata or notification in payload');
+      console.error('[eBay Account Deletion] Received:', { metadata, notification });
+      res.status(400).json({ error: 'Invalid notification payload - missing metadata or notification' });
       return;
     }
 
