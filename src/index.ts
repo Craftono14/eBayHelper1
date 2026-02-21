@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import oauthRoutes from './routes/oauth';
 import searchRoutes from './routes/search.routes';
@@ -72,22 +73,32 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Root endpoint
+// Serve frontend static files
+const frontendPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendPath));
+
+// Root endpoint - check if requesting API or frontend
 app.get('/', (_req: Request, res: Response): void => {
-  res.json({
-    message: 'Welcome to eBay Helper API',
-    status: 'running',
-    endpoints: {
-      health: '/health',
-      api: '/api',
-      auth: '/api/auth',
-      oauth: '/api/oauth',
-      search: '/api/search',
-      searches: '/api/searches',
-      ebay: '/api/ebay',
-      prices: '/api/prices',
-    },
-  });
+  // If requesting JSON (Accept header), return API info
+  if (_req.accepts('application/json')) {
+    res.json({
+      message: 'Welcome to eBay Helper API',
+      status: 'running',
+      endpoints: {
+        health: '/health',
+        api: '/api',
+        auth: '/api/auth',
+        oauth: '/api/oauth',
+        search: '/api/search',
+        searches: '/api/searches',
+        ebay: '/api/ebay',
+        prices: '/api/prices',
+      },
+    });
+  } else {
+    // Otherwise serve the frontend index.html
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  }
 });
 
 // Health check endpoint
@@ -134,9 +145,15 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction): void =>
 });
 
 // Catch any unhandled eBay-related routes before 404
-app.all('*ebay*', (req: Request, _res: Response, next: NextFunction): void => {
-  console.log('[DEBUG] Unmatched eBay route:', {
-    method: req.method,
+app.all('*ebay - serve index.html for SPA routing
+app.use((_req: Request, res: Response): void => {
+  // If it's not an API route and frontend is built, serve index.html for SPA routing
+  const indexPath = path.join(frontendPath, 'index.html');
+  try {
+    res.sendFile(indexPath);
+  } catch {
+    res.status(404).json({ error: 'Not Found', message: `Route ${_req.path} not found` });
+  }
     path: req.path,
     url: req.url,
     query: req.query,
