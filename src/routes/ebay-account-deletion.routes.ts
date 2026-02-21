@@ -112,30 +112,39 @@ router.post('/notification', async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { topic, notificationId } = metadata;
-    const { userId, deletionDate, deletionReason } = notification;
+    const { topic } = metadata;
+    const { notificationId, eventDate, data } = notification;
+
+    if (!data || !data.userId) {
+      console.error('[eBay Account Deletion] Missing user data in notification');
+      console.error('[eBay Account Deletion] Received:', { data });
+      res.status(400).json({ error: 'Invalid notification payload - missing data or userId' });
+      return;
+    }
+
+    const { userId, username, eiasToken } = data;
 
     console.log(
-      `[eBay Account Deletion] Received ${topic} notification for user: ${userId} (ID: ${notificationId})`
+      `[eBay Account Deletion] Received ${topic} notification for user: ${username} (ID: ${userId})`
     );
 
     // Process account deletion
-    if (topic === 'ACCOUNT_DELETION' || topic === 'ACCOUNT_CLOSURE') {
+    if (topic === 'MARKETPLACE_ACCOUNT_DELETION') {
       // Find and save the deletion record
       const deletionRecord = await prisma.ebayAccountDeletion.upsert({
         where: {
           ebayUserId: userId,
         },
         update: {
-          deletionReason,
-          deletionDate: new Date(deletionDate),
+          deletionReason: 'MARKETPLACE_DELETION',
+          deletionDate: new Date(eventDate),
           notificationId,
           processedAt: new Date(),
         },
         create: {
           ebayUserId: userId,
-          deletionReason,
-          deletionDate: new Date(deletionDate),
+          deletionReason: 'MARKETPLACE_DELETION',
+          deletionDate: new Date(eventDate),
           notificationId,
           processedAt: new Date(),
         },
@@ -161,28 +170,30 @@ router.post('/notification', async (req: Request, res: Response): Promise<void> 
         });
 
         console.log(
-          `[eBay Account Deletion] User account marked as deleted: ${user.id} (eBay ID: ${userId})`
+          `[eBay Account Deletion] User account marked as deleted: ${user.id} (eBay ID: ${userId}, username: ${username})`
         );
-
-        // Optional: You could also add logic here to:
-        // - Send confirmation email to user
-        // - Log the deletion for compliance
-        // - Clean up user data according to data retention policies
+      } else {
+        console.log(
+          `[eBay Account Deletion] No local user found for deletion (eBay ID: ${userId}, username: ${username}). Recording deletion anyway.`
+        );
       }
 
       // Acknowledge successful processing
       res.status(200).json({
         success: true,
-        message: `Account deletion notification processed for user ${userId}`,
+        message: `Account deletion notification processed for user ${username}`,
         recordId: deletionRecord.id,
       });
+
+      console.log(`[eBay Account Deletion] Successfully processed deletion for ${username}`);
     } else {
       // Unknown notification type
+      console.warn(`[eBay Account Deletion] Unknown notification topic: ${topic}`);
       res.status(400).json({ error: `Unknown notification topic: ${topic}` });
     }
   } catch (error) {
     console.error('[eBay Account Deletion] Error processing notification:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: String(error) });
   }
 });
 
