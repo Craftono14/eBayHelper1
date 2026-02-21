@@ -172,11 +172,11 @@ const startServer = async (): Promise<void> => {
       }
     }
 
-    app.listen(port, (): void => {
-      console.log(`✓ Server is running on http://localhost:${port}`);
-      console.log(`✓ OAuth routes available at http://localhost:${port}/api/oauth`);
-      console.log(`✓ Search routes available at http://localhost:${port}/api/search`);
-      console.log(`✓ Worker routes available at http://localhost:${port}/api/workers`);
+    app.listen(port, '0.0.0.0', (): void => {
+      console.log(`✓ Server is running on port ${port}`);
+      console.log(`✓ OAuth routes available at /api/oauth`);
+      console.log(`✓ Search routes available at /api/search`);
+      console.log(`✓ Worker routes available at /api/workers`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
