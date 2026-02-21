@@ -313,12 +313,19 @@ export class EbaySyncService {
         : 'https://api.ebay.com/ws/api.dll';
 
       // Build XML request for GetMyeBayBuying
-      // Note: Using DetailLevel ReturnAll which automatically includes all containers
+      // Request only WatchList section with detailed information
       const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBayBuyingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
     <eBayAuthToken>${user.ebayAccessToken}</eBayAuthToken>
   </RequesterCredentials>
+  <WatchList>
+    <Include>true</Include>
+    <Pagination>
+      <EntriesPerPage>200</EntriesPerPage>
+      <PageNumber>1</PageNumber>
+    </Pagination>
+  </WatchList>
   <DetailLevel>ReturnAll</DetailLevel>
 </GetMyeBayBuyingRequest>`;
 
@@ -356,6 +363,13 @@ export class EbaySyncService {
   <RequesterCredentials>
     <eBayAuthToken>${newTokens.accessToken}</eBayAuthToken>
   </RequesterCredentials>
+  <WatchList>
+    <Include>true</Include>
+    <Pagination>
+      <EntriesPerPage>200</EntriesPerPage>
+      <PageNumber>1</PageNumber>
+    </Pagination>
+  </WatchList>
   <DetailLevel>ReturnAll</DetailLevel>
 </GetMyeBayBuyingRequest>`;
 
@@ -447,10 +461,21 @@ export class EbaySyncService {
     const items: EbayWatchlistItem[] = [];
 
     try {
-      // Simple regex-based XML parsing for watchlist items
-      // For production, consider using xml2js library
+      // First, extract only the WatchList section
+      const watchListRegex = /<WatchList>([\s\S]*?)<\/WatchList>/;
+      const watchListMatch = xmlData.match(watchListRegex);
+      
+      if (!watchListMatch) {
+        console.log('[EbaySyncService] No WatchList section found in response');
+        return items;
+      }
+
+      const watchListXml = watchListMatch[1];
+      console.log('[EbaySyncService] Found WatchList section, parsing items...');
+
+      // Now parse items only from the WatchList section
       const itemRegex = /<Item>([\s\S]*?)<\/Item>/g;
-      const itemMatches = xmlData.matchAll(itemRegex);
+      const itemMatches = watchListXml.matchAll(itemRegex);
 
       for (const match of itemMatches) {
         const itemXml = match[1];
@@ -482,6 +507,8 @@ export class EbaySyncService {
           });
         }
       }
+
+      console.log(`[EbaySyncService] Parsed ${items.length} items from WatchList section`);
     } catch (error: any) {
       console.error('[EbaySyncService] Error parsing watchlist XML:', error.message);
     }
