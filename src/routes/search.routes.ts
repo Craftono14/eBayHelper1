@@ -5,6 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { requireAuth } from '../middleware/auth.middleware';
 import {
   checkAndRecordPrices,
   executeSavedSearch,
