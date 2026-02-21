@@ -5,6 +5,7 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "types": ["node"],
+    "jsx": "react-jsx",
     "skipLibCheck": true,
 
     /* Bundler mode */
