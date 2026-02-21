@@ -3,22 +3,18 @@
     "target": "ES2020",
     "module": "commonjs",
     "lib": ["ES2020"],
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "outDir": "dist",
+    "rootDir": "src",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": false,
     "sourceMap": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "types": [],
     "noImplicitAny": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
     "strict": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "frontend", "**/*.tsx", "**/*.jsx", "**/*.config.ts"]
+  "exclude": ["**/node_modules", "**/dist", "**/frontend"]
 }
