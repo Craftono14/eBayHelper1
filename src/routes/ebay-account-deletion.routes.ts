@@ -122,7 +122,7 @@ router.post('/notification', async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { userId, username, eiasToken } = data;
+    const { userId, username } = data;
 
     console.log(
       `[eBay Account Deletion] Received ${topic} notification for user: ${username} (ID: ${userId})`
