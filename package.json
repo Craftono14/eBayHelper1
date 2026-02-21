@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "prebuild": "npm --prefix frontend install && npm --prefix frontend run build",
-    "build": "tsc --project ./tsconfig.build.json --skipLibCheck --noImplicitAny false",
+    "build": "tsc --project ./tsconfig.build.json --rootDir ./src --outDir ./dist",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",

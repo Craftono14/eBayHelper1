@@ -30,8 +30,9 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    "types": []
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "frontend", "**/*.config.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "frontend"]
 }
