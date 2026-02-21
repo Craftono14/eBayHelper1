@@ -18,5 +18,5 @@
     "incremental": false
   },
   "include": ["./src/**/*.ts"],
-  "exclude": ["./frontend", "./frontend/**/*", "./node_modules", "./dist"]
+  "exclude": ["./src/**/*.tsx", "./frontend", "./frontend/**/*", "./node_modules", "./dist"]
 }
