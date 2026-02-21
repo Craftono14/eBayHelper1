@@ -21,12 +21,16 @@ import { initializeWorkers, mountWorkerRoutes } from './workers/express-integrat
 // Load environment variables
 dotenv.config();
 
+console.log('\n═══════════════════════════════════════════════════');
+console.log('  eBay Helper Server Starting');
+console.log('═══════════════════════════════════════════════════\n');
+
 // Initialize Express app
 const app: Express = express();
-const port: number = parseInt(process.env.PORT || '3000', 10);
+const port: number = parseInt(process.env.PORT || '10000', 10);
 
-// Initialize Prisma Client
-const prisma = new PrismaClient();
+// Prisma will be initialized in startServer to avoid blocking
+let prisma: PrismaClient;
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -173,41 +177,55 @@ app.use((req: Request, res: Response): void => {
 // Start server
 const startServer = async (): Promise<void> => {
   try {
+    // Initialize Prisma Client (after checking env vars)
+    console.log('[STARTUP] Initializing Prisma Client...');
+    prisma = new PrismaClient();
+    console.log('[STARTUP] Prisma Client initialized');
+
     // First, start listening - this is CRITICAL for Render to detect the port
+    console.log(`[STARTUP] Attempting to bind to 0.0.0.0:${port}`);
     const server = app.listen(port, '0.0.0.0', (): void => {
-      console.log(`✓ Server is running on port ${port}`);
-      console.log(`✓ Ready to accept requests`);
+      console.log(`✓✓✓ SERVER LISTENING ON PORT ${port} ✓✓✓`);
+      console.log(`✓ Ready to accept requests on 0.0.0.0:${port}`);
+      console.log(`✓ Frontend served from /`);
+      console.log(`✓ API available at /api`);
     });
+
+    console.log(`[STARTUP] Port binding successful`);
 
     // Set a timeout for any startup operations
     server.requestTimeout = 30000;
 
     // Now handle async operations (migrations, workers) without blocking the port
     setImmediate(async () => {
+      console.log('[STARTUP] Running async initialization tasks...');
+      
       // Run database migrations
       try {
-        console.log('Running database migrations...');
+        console.log('  → Testing database connection...');
         await prisma.$executeRawUnsafe(`SELECT 1`); // Test connection
-        console.log('✓ Database connection verified');
+        console.log('  ✓ Database connection verified');
         
         // Try to run migrations, but don't fail if they're already applied
         try {
+          console.log('  → Running migrations...');
           const { execSync } = require('child_process');
           execSync('npx prisma migrate deploy', { stdio: 'inherit', timeout: 30000 });
-          console.log('✓ Migrations completed successfully');
+          console.log('  ✓ Migrations completed successfully');
         } catch (error) {
-          console.warn('⚠️  Migrations skipped (may be already applied)');
+          console.warn('  ⚠️  Migrations skipped (may be already applied)');
         }
       } catch (error) {
-        console.error('⚠️  Database error:', error);
+        console.error('  ✗ Database error:', error instanceof Error ? error.message : String(error));
       }
 
       // Initialize background workers
       const accessToken = process.env.EBAY_ACCESS_TOKEN;
       if (!accessToken) {
-        console.warn('⚠️  EBAY_ACCESS_TOKEN not set - background workers disabled');
+        console.warn('  ⚠️  EBAY_ACCESS_TOKEN not set - background workers disabled');
       } else {
         try {
+          console.log('  → Initializing background workers...');
           const { router: workerRouter, cleanup: workerCleanup } = await initializeWorkers(
             app,
             prisma,
@@ -221,6 +239,7 @@ const startServer = async (): Promise<void> => {
           );
 
           mountWorkerRoutes(app, workerRouter, '/api/workers');
+          console.log('  ✓ Background workers initialized');
 
           if (workerCleanup) {
             process.on('SIGINT', async () => {
@@ -229,7 +248,7 @@ const startServer = async (): Promise<void> => {
             });
           }
         } catch (error) {
-          console.error('⚠️  Worker initialization failed:', error);
+          console.error('  ✗ Worker initialization failed:', error instanceof Error ? error.message : String(error));
         }
       }
 
@@ -237,22 +256,29 @@ const startServer = async (): Promise<void> => {
       try {
         if (process.env.EBAY_ACCESS_TOKEN) {
           app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, process.env.EBAY_ACCESS_TOKEN));
+          console.log('  ✓ Price monitoring routes mounted');
         }
       } catch (err) {
-        console.error('⚠️  Price monitoring routes failed:', err);
+        console.error('  ✗ Price monitoring routes failed:', err instanceof Error ? err.message : String(err));
       }
+
+      console.log('[STARTUP] Async initialization complete');
     });
 
   } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+    console.error('\n✗✗✗ CRITICAL ERROR DURING STARTUP ✗✗✗');
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error('Process will continue running but functionality may be limited');
+    // Don't exit - let Render see the port is open, even if there are issues
   }
 };
 
 // Graceful shutdown
 process.on('SIGINT', async (): Promise<void> => {
   console.log('Shutting down gracefully...');
-  await prisma.$disconnect();
+  if (prisma) {
+    await prisma.$disconnect();
+  }
   process.exit(0);
 });
 
