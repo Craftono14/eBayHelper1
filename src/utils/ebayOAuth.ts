@@ -27,19 +27,6 @@ export interface OAuthTokens {
   expiresAt: Date;
 }
 
-// OAuth state store for CSRF protection
-const stateStore = new Map<string, { state: string; expiresAt: Date }>();
-
-// Clean up expired states every 10 minutes
-setInterval(() => {
-  const now = new Date();
-  for (const [key, value] of stateStore.entries()) {
-    if (value.expiresAt < now) {
-      stateStore.delete(key);
-    }
-  }
-}, 10 * 60 * 1000);
-
 /**
  * Get eBay OAuth endpoints based on sandbox flag
  */
@@ -57,26 +44,70 @@ function getOAuthEndpoints(sandbox: boolean): { auth: string; token: string } {
 }
 
 /**
- * Generate a random state parameter for CSRF protection
+ * Get the state signing secret from environment or generate a default
+ * In production, OAUTH_STATE_SECRET should be set in environment variables
  */
-function generateState(): string {
-  return crypto.randomBytes(32).toString('hex');
+function getStateSecret(): string {
+  return process.env.OAUTH_STATE_SECRET || process.env.JWT_SECRET || 'default-oauth-state-secret-change-me';
 }
 
 /**
- * Validate a state parameter
+ * Generate a signed state parameter for CSRF protection
+ * Format: timestamp.random.signature
+ */
+function generateState(): string {
+  const timestamp = Date.now().toString();
+  const random = crypto.randomBytes(16).toString('hex');
+  const secret = getStateSecret();
+  
+  // Create signature: HMAC of timestamp + random
+  const hmac = crypto.createHmac('sha256', secret);
+  hmac.update(`${timestamp}.${random}`);
+  const signature = hmac.digest('hex');
+  
+  return `${timestamp}.${random}.${signature}`;
+}
+
+/**
+ * Validate a signed state parameter
+ * Returns true if state is valid and not expired (10 minute window)
  */
 export function validateState(state: string): boolean {
-  const stored = stateStore.get(state);
-  if (!stored) {
+  try {
+    const parts = state.split('.');
+    if (parts.length !== 3) {
+      console.warn('[OAuth] Invalid state format - expected 3 parts');
+      return false;
+    }
+    
+    const [timestamp, random, signature] = parts;
+    const secret = getStateSecret();
+    
+    // Verify signature
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(`${timestamp}.${random}`);
+    const expectedSignature = hmac.digest('hex');
+    
+    if (signature !== expectedSignature) {
+      console.warn('[OAuth] Invalid state signature');
+      return false;
+    }
+    
+    // Check if state is expired (10 minute window)
+    const stateTimestamp = parseInt(timestamp);
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000;
+    
+    if (now - stateTimestamp > tenMinutes) {
+      console.warn('[OAuth] State expired');
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('[OAuth] Error validating state:', error);
     return false;
   }
-  if (stored.expiresAt < new Date()) {
-    stateStore.delete(state);
-    return false;
-  }
-  stateStore.delete(state); // State can only be used once
-  return true;
 }
 
 /**
@@ -93,12 +124,6 @@ export function generateConsentUrl(config: EbayOAuthConfig, scopes: string[] = [
   }
 
   const state = generateState();
-  // Store state for validation (expires in 10 minutes)
-  stateStore.set(state, {
-    state,
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-  });
-
   const endpoints = getOAuthEndpoints(config.sandbox);
 
   const params = new URLSearchParams({

@@ -58,26 +58,54 @@ router.get('/callback', async (req: Request, res: Response, next: NextFunction):
   try {
     const { code, state } = req.query;
 
+    console.log('[OAuth Callback] Received callback from eBay', {
+      hasCode: !!code,
+      hasState: !!state,
+      state: state,
+    });
+
     // Validate query parameters
     if (!code || !state) {
-      res.status(400).json({
-        error: 'Missing required parameters',
-        message: 'Both code and state are required',
-      });
+      console.error('[OAuth Callback] Missing required parameters');
+      res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+          <head><title>OAuth Error</title></head>
+          <body>
+            <h1>OAuth Error</h1>
+            <p>Missing required parameters (code or state)</p>
+            <a href="/">Return to Home</a>
+          </body>
+        </html>
+      `);
       return;
     }
 
     // Validate state parameter (CSRF protection)
+    console.log('[OAuth Callback] Validating state parameter...');
     if (!validateState(state as string)) {
-      res.status(400).json({
-        error: 'Invalid state',
-        message: 'State parameter validation failed. This may indicate a CSRF attack.',
-      });
+      console.error('[OAuth Callback] State validation failed');
+      res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+          <head><title>OAuth Error</title></head>
+          <body>
+            <h1>OAuth Error</h1>
+            <p>State parameter validation failed. This may indicate a CSRF attack or an expired link.</p>
+            <p>Please try linking your eBay account again.</p>
+            <a href="/">Return to Home</a>
+          </body>
+        </html>
+      `);
       return;
     }
 
+    console.log('[OAuth Callback] State validated successfully');
+
     // Exchange code for tokens
+    console.log('[OAuth Callback] Exchanging code for tokens...');
     const tokens = await exchangeCodeForTokens(code as string, ebayOAuthConfig);
+    console.log('[OAuth Callback] Tokens received successfully');
 
     // Get or create user (for demo, create a test user or use header-provided ID)
     // In production, this would be tied to the authenticated Discord user
@@ -93,17 +121,24 @@ router.get('/callback', async (req: Request, res: Response, next: NextFunction):
       },
     });
 
-    res.json({
-      message: 'OAuth authorization successful',
-      user: {
-        id: user.id,
-        discordId: user.discordId,
-        ebayAuthenticated: true,
-        tokenExpiresAt: user.ebayTokenExpiry,
-      },
-    });
+    console.log('[OAuth Callback] User updated successfully:', user.id);
+
+    // Redirect to frontend success page
+    res.redirect('/?ebay-linked=success');
   } catch (error) {
-    next(error);
+    console.error('[OAuth Callback] Error during callback processing:', error);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>OAuth Error</title></head>
+        <body>
+          <h1>OAuth Error</h1>
+          <p>An error occurred while linking your eBay account.</p>
+          <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          <a href="/">Return to Home</a>
+        </body>
+      </html>
+    `);
   }
 });
 
