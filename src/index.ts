@@ -173,61 +173,75 @@ app.use((req: Request, res: Response): void => {
 // Start server
 const startServer = async (): Promise<void> => {
   try {
-    app.listen(port, '0.0.0.0', (): void => {
+    // First, start listening - this is CRITICAL for Render to detect the port
+    const server = app.listen(port, '0.0.0.0', (): void => {
       console.log(`✓ Server is running on port ${port}`);
-      console.log(`✓ OAuth routes available at /api/oauth`);
-      console.log(`✓ Search routes available at /api/search`);
-      console.log(`✓ Worker routes available at /api/workers`);
+      console.log(`✓ Ready to accept requests`);
     });
 
-    // Run database migrations on startup
-    try {
-      console.log('Running database migrations...');
-      const { execSync } = require('child_process');
-      execSync('npx prisma migrate deploy', { stdio: 'inherit' });
-      console.log('✓ Migrations completed successfully');
-    } catch (error) {
-      console.error('⚠️  Migration warning (may be normal if already migrated):', error);
-      // Don't exit here - migrations might already be applied
-    }
+    // Set a timeout for any startup operations
+    server.requestTimeout = 30000;
 
-    // Initialize background workers
-    const accessToken = process.env.EBAY_ACCESS_TOKEN;
-    if (!accessToken) {
-      console.warn('⚠️  EBAY_ACCESS_TOKEN not set - background workers disabled');
-    } else {
+    // Now handle async operations (migrations, workers) without blocking the port
+    setImmediate(async () => {
+      // Run database migrations
       try {
-        const { router: workerRouter, cleanup: workerCleanup } = await initializeWorkers(
-          app,
-          prisma,
-          accessToken,
-          {
-            useBullMQ: process.env.USE_BULLMQ === 'true', // Set to 'true' to use BullMQ instead of node-cron
-            cronSchedule: process.env.WORKER_SCHEDULE || '*/5 * * * *', // Default: every 5 minutes
-            sandbox: process.env.EBAY_SANDBOX === 'true',
-            redisUrl: process.env.REDIS_URL,
-          }
-        );
-
-        mountWorkerRoutes(app, workerRouter, '/api/workers');
-
-        // Store cleanup function for graceful shutdown
-        if (workerCleanup) {
-          process.on('SIGINT', async () => {
-            console.log('Cleaning up workers...');
-            await workerCleanup();
-          });
+        console.log('Running database migrations...');
+        await prisma.$executeRawUnsafe(`SELECT 1`); // Test connection
+        console.log('✓ Database connection verified');
+        
+        // Try to run migrations, but don't fail if they're already applied
+        try {
+          const { execSync } = require('child_process');
+          execSync('npx prisma migrate deploy', { stdio: 'inherit', timeout: 30000 });
+          console.log('✓ Migrations completed successfully');
+        } catch (error) {
+          console.warn('⚠️  Migrations skipped (may be already applied)');
         }
       } catch (error) {
-        console.error('Failed to initialize workers:', error);
+        console.error('⚠️  Database error:', error);
       }
-      // Mount price monitoring routes (protected) when access token available
+
+      // Initialize background workers
+      const accessToken = process.env.EBAY_ACCESS_TOKEN;
+      if (!accessToken) {
+        console.warn('⚠️  EBAY_ACCESS_TOKEN not set - background workers disabled');
+      } else {
+        try {
+          const { router: workerRouter, cleanup: workerCleanup } = await initializeWorkers(
+            app,
+            prisma,
+            accessToken,
+            {
+              useBullMQ: process.env.USE_BULLMQ === 'true',
+              cronSchedule: process.env.WORKER_SCHEDULE || '*/5 * * * *',
+              sandbox: process.env.EBAY_SANDBOX === 'true',
+              redisUrl: process.env.REDIS_URL,
+            }
+          );
+
+          mountWorkerRoutes(app, workerRouter, '/api/workers');
+
+          if (workerCleanup) {
+            process.on('SIGINT', async () => {
+              console.log('Cleaning up workers...');
+              await workerCleanup();
+            });
+          }
+        } catch (error) {
+          console.error('⚠️  Worker initialization failed:', error);
+        }
+      }
+
+      // Mount price monitoring routes
       try {
-        app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, accessToken));
+        if (process.env.EBAY_ACCESS_TOKEN) {
+          app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, process.env.EBAY_ACCESS_TOKEN));
+        }
       } catch (err) {
-        console.error('Failed to mount price monitoring routes:', err);
+        console.error('⚠️  Price monitoring routes failed:', err);
       }
-    }
+    });
 
   } catch (error) {
     console.error('Failed to start server:', error);
