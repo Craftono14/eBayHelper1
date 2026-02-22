@@ -732,16 +732,20 @@ export class EbaySyncService {
 
         // Extract all fields from MyeBayFavoriteSearchType
         const searchName = this.extractXmlValue(searchXml, 'SearchName');
-        
-        // Log raw XML for debugging category issues
-        if (searchName && searchName.toLowerCase().includes('mushishi')) {
-          console.log(`[EbaySyncService] Raw XML for search "${searchName}":`);
-          console.log(searchXml.substring(0, 2000)); // First 2000 chars
-        }
-        
         const queryKeywords = this.extractXmlValue(searchXml, 'QueryKeywords');
         const searchQuery = this.extractXmlValue(searchXml, 'SearchQuery');
-        const categoryId = this.extractXmlValue(searchXml, 'CategoryID');
+        
+        // Try to get CategoryID from XML field first, then from SearchQuery URL
+        let categoryId = this.extractXmlValue(searchXml, 'CategoryID');
+        if (!categoryId && searchQuery) {
+          // Extract category from _sacat parameter in SearchQuery URL
+          const sacatMatch = searchQuery.match(/[?&]_sacat=(\d+)/);
+          if (sacatMatch) {
+            categoryId = sacatMatch[1];
+            console.log(`[EbaySyncService] Extracted category ${categoryId} from SearchQuery URL for "${searchName}"`);
+          }
+        }
+        
         const priceMinValue = this.extractXmlValue(searchXml, 'PriceMin');
         const priceMaxValue = this.extractXmlValue(searchXml, 'PriceMax');
         const currency = this.extractXmlValue(searchXml, 'Currency');
