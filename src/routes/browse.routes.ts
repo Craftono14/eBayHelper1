@@ -98,15 +98,28 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
     const itemSummaries = response.data.itemSummaries || [];
 
     // Transform response to include only needed fields
-    const items = itemSummaries.map((item: any) => ({
-      itemId: item.itemId,
-      title: item.title,
-      image: item.image,
-      price: item.price,
-      buyingOptions: item.buyingOptions || [],
-      shippingOptions: item.shippingOptions,
-      itemWebUrl: item.itemWebUrl,
-    }));
+    const items = itemSummaries.map((item: any) => {
+      const transformedItem = {
+        itemId: item.itemId,
+        title: item.title,
+        image: item.image,
+        price: item.price,
+        buyingOptions: item.buyingOptions || [],
+        shippingOptions: item.shippingOptions,
+        itemWebUrl: item.itemWebUrl,
+      };
+      
+      // Debug log first few items to see structure
+      if (!transformedItem.price?.value) {
+        console.log('[browse] Item missing price value:', {
+          itemId: item.itemId,
+          title: item.title?.substring(0, 50),
+          price: item.price,
+        });
+      }
+      
+      return transformedItem;
+    });
 
     res.json({
       items,

@@ -93,9 +93,11 @@ export const SearchResults: React.FC = () => {
         if (!response.ok) throw new Error('Failed to fetch items');
 
         const data: SearchResponse = await response.json();
+        console.log('[SearchResults] Items received:', data.items?.slice(0, 3)); // Log first 3 items for debugging
         setItems(data.items || []);
         setTotal(data.total || 0);
       } catch (err) {
+        console.error('[SearchResults] Error fetching items:', err);
         setError(err instanceof Error ? err.message : 'Failed to load search results');
       } finally {
         setLoading(false);
@@ -179,71 +181,82 @@ export const SearchResults: React.FC = () => {
         <>
           {/* Items Grid */}
           <div className="grid grid-cols-5 gap-6 mb-8">
-            {items.map((item) => (
-              <a
-                key={item.itemId}
-                href={item.itemWebUrl || `https://www.ebay.com/itm/${item.itemId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden flex flex-col group"
-              >
-                {/* Image */}
-                <div className="w-full h-48 bg-gray-100 overflow-hidden flex items-center justify-center">
-                  {item.image?.imageUrl ? (
-                    <img
-                      src={item.image.imageUrl}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition"
-                    />
-                  ) : (
-                    <span className="text-xs text-gray-500">No image</span>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="p-4 flex-1 flex flex-col">
-                  {/* Title */}
-                  <h3 className="text-sm font-semibold mb-3 line-clamp-2 group-hover:text-blue-600">
-                    {item.title}
-                  </h3>
-
-                  {/* Spacer */}
-                  <div className="flex-1"></div>
-
-                  {/* Price */}
-                  <div className="mb-3">
-                    <p className="text-xl font-bold text-blue-600">
-                      ${parseFloat(item.price.value).toFixed(2)}
-                    </p>
+            {items.filter(item => item?.itemId).map((item) => {
+              const price = item.price?.value ? parseFloat(item.price.value).toFixed(2) : 'N/A';
+              const currency = item.price?.currency || 'USD';
+              
+              return (
+                <a
+                  key={item.itemId}
+                  href={item.itemWebUrl || `https://www.ebay.com/itm/${item.itemId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden flex flex-col group"
+                >
+                  {/* Image */}
+                  <div className="w-full h-48 bg-gray-100 overflow-hidden flex items-center justify-center">
+                    {item.image?.imageUrl ? (
+                      <img
+                        src={item.image.imageUrl}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition"
+                      />
+                    ) : (
+                      <span className="text-xs text-gray-500">No image</span>
+                    )}
                   </div>
 
-                  {/* Shipping */}
-                  <div className="mb-3 pb-3 border-b border-gray-200">
-                    <p className="text-sm text-gray-600">
-                      Shipping: <span className="font-semibold">{getShippingCost(item)}</span>
-                    </p>
-                  </div>
+                  {/* Content */}
+                  <div className="p-4 flex-1 flex flex-col">
+                    {/* Title */}
+                    <h3 className="text-sm font-semibold mb-3 line-clamp-2 group-hover:text-blue-600">
+                      {item.title || 'Untitled Item'}
+                    </h3>
 
-                  {/* Listing Type */}
-                  <div className="flex flex-wrap gap-2">
-                    {item.buyingOptions.map((option) => (
-                      <span
-                        key={option}
-                        className={`text-xs px-2 py-1 rounded ${
-                          option === 'FIXED_PRICE'
-                            ? 'bg-green-100 text-green-800'
-                            : option === 'AUCTION'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {option === 'FIXED_PRICE' ? 'Buy It Now' : option}
-                      </span>
-                    ))}
+                    {/* Spacer */}
+                    <div className="flex-1"></div>
+
+                    {/* Price */}
+                    <div className="mb-3">
+                      <p className="text-xl font-bold text-blue-600">
+                        {price === 'N/A' ? 'Price N/A' : `$${price}`}
+                      </p>
+                    </div>
+
+                    {/* Shipping */}
+                    <div className="mb-3 pb-3 border-b border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Shipping: <span className="font-semibold">{getShippingCost(item)}</span>
+                      </p>
+                    </div>
+
+                    {/* Listing Type */}
+                    <div className="flex flex-wrap gap-2">
+                      {item.buyingOptions && item.buyingOptions.length > 0 ? (
+                        item.buyingOptions.map((option) => (
+                          <span
+                            key={option}
+                            className={`text-xs px-2 py-1 rounded ${
+                              option === 'FIXED_PRICE'
+                                ? 'bg-green-100 text-green-800'
+                                : option === 'AUCTION'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {option === 'FIXED_PRICE' ? 'Buy It Now' : option}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-800">
+                          Unknown
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </a>
-            ))}
+                </a>
+              );
+            })}
           </div>
 
           {/* Pagination */}
