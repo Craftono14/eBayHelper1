@@ -732,6 +732,13 @@ export class EbaySyncService {
 
         // Extract all fields from MyeBayFavoriteSearchType
         const searchName = this.extractXmlValue(searchXml, 'SearchName');
+        
+        // Log raw XML for debugging category issues
+        if (searchName && searchName.toLowerCase().includes('mushishi')) {
+          console.log(`[EbaySyncService] Raw XML for search "${searchName}":`);
+          console.log(searchXml.substring(0, 2000)); // First 2000 chars
+        }
+        
         const queryKeywords = this.extractXmlValue(searchXml, 'QueryKeywords');
         const searchQuery = this.extractXmlValue(searchXml, 'SearchQuery');
         const categoryId = this.extractXmlValue(searchXml, 'CategoryID');
