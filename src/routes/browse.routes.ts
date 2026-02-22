@@ -68,14 +68,14 @@ async function getEbayAppToken(): Promise<string> {
  */
 router.get('/search', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { q, limit = '50', offset = '0', sort } = req.query;
+    const { q, limit = '50', offset = '0', sort, filter } = req.query;
 
     if (!q || typeof q !== 'string') {
       res.status(400).json({ error: 'Missing required query parameter: q' });
       return;
     }
 
-    console.log('[browse] Search request:', { q, limit, offset, sort });
+    console.log('[browse] Search request:', { q, limit, offset, sort, filter });
 
     // Get app token for Browse API access
     const accessToken = await getEbayAppToken();
@@ -94,6 +94,12 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
     if (sort) {
       params.sort = sort.toString();
       console.log('[browse] Applied sort:', sort);
+    }
+
+    // Add filter parameter if provided
+    if (filter) {
+      params.filter = filter.toString();
+      console.log('[browse] Applied filter:', filter);
     }
 
     const response = await axios.get(browseUrl, {

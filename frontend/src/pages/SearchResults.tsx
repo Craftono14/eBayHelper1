@@ -29,6 +29,22 @@ interface SearchResponse {
   limit: number;
 }
 
+interface SavedSearchDetails {
+  id: number;
+  name: string;
+  searchKeywords: string;
+  sortBy?: string | null;
+  sortOrder?: string | null;
+  buyingFormat?: string | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  condition?: string | null;
+  categories?: string | null;
+  itemLocation?: string | null;
+  currency?: string | null;
+  freeShipping?: boolean;
+}
+
 export const SearchResults: React.FC = () => {
   const { searchId } = useParams<{ searchId: string }>();
   const navigate = useNavigate();
@@ -37,6 +53,7 @@ export const SearchResults: React.FC = () => {
   const [searchName, setSearchName] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortParam, setSortParam] = useState<string>('');
+  const [filterParam, setFilterParam] = useState<string>('');
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -91,6 +108,60 @@ export const SearchResults: React.FC = () => {
     return '';
   };
 
+  // Build Browse API filter string from saved search details
+  const buildFilterString = (search: SavedSearchDetails): string => {
+    const filters: string[] = [];
+
+    // Price range filter
+    if (search.minPrice !== null && search.minPrice !== undefined && 
+        search.maxPrice !== null && search.maxPrice !== undefined) {
+      filters.push(`price:[${search.minPrice}..${search.maxPrice}]`);
+    } else if (search.minPrice !== null && search.minPrice !== undefined) {
+      filters.push(`price:[${search.minPrice}..]`);
+    } else if (search.maxPrice !== null && search.maxPrice !== undefined) {
+      filters.push(`price:[..${search.maxPrice}]`);
+    }
+
+    // Currency filter
+    if (search.currency) {
+      filters.push(`priceCurrency:${search.currency}`);
+    }
+
+    // Condition filter (map to Browse API format)
+    if (search.condition) {
+      const conditionMap: Record<string, string> = {
+        'New': 'NEW',
+        'Used': 'USED',
+        'Refurbished': 'REFURBISHED',
+        'For parts or not working': 'FOR_PARTS_OR_NOT_WORKING',
+      };
+      const browseCondition = conditionMap[search.condition] || search.condition.toUpperCase().replace(/ /g, '_');
+      filters.push(`conditions:{${browseCondition}}`);
+    }
+
+    // Buying format filter
+    if (search.buyingFormat) {
+      const formatMap: Record<string, string> = {
+        'Auction': 'AUCTION',
+        'Buy It Now': 'FIXED_PRICE',
+        'FixItPrice': 'FIXED_PRICE',
+        'AuctionWithBIN': 'AUCTION|FIXED_PRICE',
+        'Both': 'AUCTION|FIXED_PRICE',
+      };
+      const browseFormat = formatMap[search.buyingFormat] || 'FIXED_PRICE';
+      filters.push(`buyingOptions:{${browseFormat}}`);
+    }
+
+    // Free shipping filter
+    if (search.freeShipping) {
+      filters.push('maxDeliveryCost:0');
+    }
+
+    const filterString = filters.join(',');
+    console.log('[SearchResults] Built filter string:', filterString);
+    return filterString;
+  };
+
   // Fetch search details first
   useEffect(() => {
     if (!isLoggedIn || !searchId) return;
@@ -105,7 +176,7 @@ export const SearchResults: React.FC = () => {
 
         if (!response.ok) throw new Error('Failed to fetch search details');
 
-        const search = await response.json();
+        const search: SavedSearchDetails = await response.json();
         console.log('[SearchResults] Full search object:', search);
         
         setSearchName(search.name);
@@ -114,6 +185,11 @@ export const SearchResults: React.FC = () => {
         // Map the sort preference to Browse API format
         const sortValue = mapSortToBrowseAPI(search.sortBy, search.sortOrder);
         setSortParam(sortValue);
+        
+        // Build filter string
+        const filterValue = buildFilterString(search);
+        setFilterParam(filterValue);
+        
         console.log('[SearchResults] Sort mapping:', { 
           rawSortBy: search.sortBy,
           mappedBrowseSort: sortValue,
@@ -137,10 +213,13 @@ export const SearchResults: React.FC = () => {
         setLoading(true);
         setError('');
 
-        // Build URL with sort parameter if available
+        // Build URL with sort and filter parameters
         let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${currentOffset}`;
         if (sortParam) {
           url += `&sort=${encodeURIComponent(sortParam)}`;
+        }
+        if (filterParam) {
+          url += `&filter=${encodeURIComponent(filterParam)}`;
         }
 
         const response = await fetch(url);
@@ -154,6 +233,7 @@ export const SearchResults: React.FC = () => {
           offset: data.offset,
           limit: data.limit,
           appliedSort: sortParam,
+          appliedFilter: filterParam,
         });
         console.log('[SearchResults] Items received:', data.items);
         setItems(data.items || []);
@@ -167,7 +247,7 @@ export const SearchResults: React.FC = () => {
     };
 
     fetchItems();
-  }, [searchQuery, currentOffset, limit, sortParam]);
+  }, [searchQuery, currentOffset, limit, sortParam, filterParam]);
 
   const getShippingCost = (item: ItemSummary): string => {
     try {

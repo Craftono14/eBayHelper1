@@ -63,6 +63,10 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<any
       minPrice: search.minPrice,
       maxPrice: search.maxPrice,
       condition: search.condition,
+      categories: search.categories,
+      itemLocation: search.itemLocation,
+      currency: search.currency,
+      freeShipping: search.freeShipping,
     });
   } catch (error) {
     console.error('[searches] get by id error', error);
