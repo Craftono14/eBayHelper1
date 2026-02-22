@@ -267,16 +267,14 @@ router.post('/check-prices', async (req: Request, res: Response): Promise<void> 
 router.get('/wishlist', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user?.id;
-    const filter = req.query.filter || 'active'; // active, won, purchased, all
+    const filter = req.query.filter || 'all'; // active, ended, all
 
     const whereClause =
       filter === 'active'
         ? { userId, isActive: true }
-        : filter === 'won'
-          ? { userId, isWon: true }
-          : filter === 'purchased'
-            ? { userId, isPurchased: true }
-            : { userId };
+        : filter === 'ended'
+          ? { userId, isActive: false }
+          : { userId };
 
     const items = await prisma.wishlistItem.findMany({
       where: whereClause,

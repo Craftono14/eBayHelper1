@@ -28,7 +28,7 @@ export const Wishlist: React.FC = () => {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'active' | 'won' | 'purchased' | 'all'>('active');
+  const [filter, setFilter] = useState<'active' | 'ended' | 'all'>('all');
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
@@ -172,36 +172,26 @@ export const Wishlist: React.FC = () => {
 
           {/* Filter Tabs */}
           <div className="flex gap-2">
-          <button
-            onClick={() => setFilter('active')}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              filter === 'active'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Active
-          </button>
-          <button
-            onClick={() => setFilter('won')}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              filter === 'won'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Won
-          </button>
-          <button
-            onClick={() => setFilter('purchased')}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              filter === 'purchased'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Purchased
-          </button>
+            <button
+              onClick={() => setFilter('active')}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                filter === 'active'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setFilter('ended')}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                filter === 'ended'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Ended
+            </button>
           <button
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-lg font-medium transition ${
