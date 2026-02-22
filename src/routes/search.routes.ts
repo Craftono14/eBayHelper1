@@ -287,7 +287,10 @@ router.get('/wishlist', requireAuth, async (req: Request, res: Response): Promis
         id: item.id,
         ebayItemId: item.ebayItemId,
         title: item.itemTitle,
+        itemUrl: item.itemUrl,
+        itemImageUrl: item.itemImageUrl,
         currentPrice: item.currentPrice,
+        shippingCost: item.shippingCost ?? item.priceHistory?.[0]?.shippingCost ?? null,
         targetPrice: item.targetPrice,
         seller: item.seller,
         sellerRating: item.sellerRating,
@@ -361,9 +364,9 @@ router.post('/wishlist', requireAuth, async (req: Request, res: Response): Promi
  * DELETE /api/search/wishlist/:id
  * Remove item from wishlist
  */
-router.delete('/wishlist/:id', async (req: Request, res: Response): Promise<void> => {
+router.delete('/wishlist/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id;
     const itemId = parseInt(req.params.id);
 
     // Verify ownership
@@ -373,6 +376,11 @@ router.delete('/wishlist/:id', async (req: Request, res: Response): Promise<void
 
     if (!item || item.userId !== userId) {
       res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    if (item.isEbayImported) {
+      res.status(403).json({ error: 'Imported eBay items cannot be deleted here' });
       return;
     }
 
@@ -443,9 +451,10 @@ router.get('/notifications', async (req: Request, res: Response): Promise<void> 
  */
 router.post(
   '/send-notifications',
+  requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = (req as any).userId;
+      const userId = (req as any).user?.id;
 
       // Run notifications async
       notifyPriceDrops(userId).catch((error) => {

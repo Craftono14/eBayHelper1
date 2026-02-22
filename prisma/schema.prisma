@@ -130,6 +130,7 @@ model WishlistItem {
   ebayItemId              String?        // eBay item ID (null for local-only items)
   itemTitle               String?        // Item name/title
   itemUrl                 String?        // Direct link to eBay listing
+  itemImageUrl            String?        // Listing image URL
   
   // Search association (optional - item could come from multiple searches)
   searchId                Int?
@@ -137,6 +138,7 @@ model WishlistItem {
   
   // Price tracking
   currentPrice            Decimal?       @db.Decimal(10, 2)
+  shippingCost            Decimal?       @db.Decimal(10, 2)
   targetPrice             Decimal        @db.Decimal(10, 2) // Price user wants to buy at
   lowestPriceRecorded     Decimal?       @db.Decimal(10, 2)
   highestPriceRecorded    Decimal?       @db.Decimal(10, 2)

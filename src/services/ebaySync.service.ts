@@ -36,7 +36,12 @@ interface EbayWatchlistItem {
   itemId: string;
   title: string;
   itemWebUrl?: string;
+  itemImageUrl?: string;
   price?: {
+    value: string;
+    currency: string;
+  };
+  shippingCost?: {
     value: string;
     currency: string;
   };
@@ -456,6 +461,9 @@ export class EbaySyncService {
           const currentPrice = ebayItem.price
             ? parseFloat(ebayItem.price.value)
             : null;
+          const shippingCost = ebayItem.shippingCost
+            ? parseFloat(ebayItem.shippingCost.value)
+            : null;
 
           // Find existing item or create new one
           const existingItem = await prisma.wishlistItem.findFirst({
@@ -472,7 +480,9 @@ export class EbaySyncService {
               data: {
                 itemTitle: ebayItem.title,
                 itemUrl: ebayItem.itemWebUrl,
+                itemImageUrl: ebayItem.itemImageUrl,
                 currentPrice: currentPrice,
+                shippingCost: shippingCost,
                 seller: ebayItem.seller?.username,
                 sellerRating: ebayItem.seller?.feedbackScore,
                 isEbayImported: true,
@@ -488,7 +498,9 @@ export class EbaySyncService {
                 ebayItemId: ebayItem.itemId,
                 itemTitle: ebayItem.title,
                 itemUrl: ebayItem.itemWebUrl,
+                itemImageUrl: ebayItem.itemImageUrl,
                 currentPrice: currentPrice,
+                shippingCost: shippingCost,
                 targetPrice: currentPrice || 0, // Default to current price
                 seller: ebayItem.seller?.username,
                 sellerRating: ebayItem.seller?.feedbackScore,
@@ -541,8 +553,24 @@ export class EbaySyncService {
         const itemId = this.extractXmlValue(itemXml, 'ItemID');
         const title = this.extractXmlValue(itemXml, 'Title');
         const itemWebUrl = this.extractXmlValue(itemXml, 'ListingDetails', 'ViewItemURL');
+        const imageUrl =
+          this.extractXmlValue(itemXml, 'PictureDetails', 'GalleryURL') ||
+          this.extractXmlValue(itemXml, 'PictureDetails', 'PictureURL');
         const priceValue = this.extractXmlValue(itemXml, 'SellingStatus', 'CurrentPrice');
         const priceCurrency = this.extractXmlValue(itemXml, 'SellingStatus', 'CurrentPrice', 'currencyID');
+        const shippingValue = this.extractXmlValue(
+          itemXml,
+          'ShippingDetails',
+          'ShippingServiceOptions',
+          'ShippingServiceCost'
+        );
+        const shippingCurrency = this.extractXmlValue(
+          itemXml,
+          'ShippingDetails',
+          'ShippingServiceOptions',
+          'ShippingServiceCost',
+          'currencyID'
+        );
         const sellerUsername = this.extractXmlValue(itemXml, 'Seller', 'UserID');
         const sellerFeedback = this.extractXmlValue(itemXml, 'Seller', 'FeedbackScore');
         const quantity = this.extractXmlValue(itemXml, 'Quantity');
@@ -552,9 +580,14 @@ export class EbaySyncService {
             itemId,
             title: title || '',
             itemWebUrl: itemWebUrl,
+            itemImageUrl: imageUrl,
             price: priceValue ? {
               value: priceValue,
               currency: priceCurrency || 'USD',
+            } : undefined,
+            shippingCost: shippingValue ? {
+              value: shippingValue,
+              currency: shippingCurrency || 'USD',
             } : undefined,
             seller: sellerUsername ? {
               username: sellerUsername,
