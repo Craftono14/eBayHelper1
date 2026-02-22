@@ -13,6 +13,7 @@ interface WishlistItem {
   seller: string | null;
   sellerRating: number | null;
   isActive: boolean;
+  listingStatus: string | null;
   isWon: boolean;
   isPurchased: boolean;
   isEbayImported: boolean;
@@ -291,6 +292,10 @@ export const Wishlist: React.FC = () => {
                     <div>
                       <span className="font-medium">Shipping:</span>{' '}
                       {item.shippingCost !== null ? `$${item.shippingCost.toFixed(2)}` : 'N/A'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Status:</span>{' '}
+                      {item.listingStatus || (item.isActive ? 'Active' : 'Ended')}
                     </div>
                   </div>
 

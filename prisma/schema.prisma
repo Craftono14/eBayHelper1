@@ -149,6 +149,7 @@ model WishlistItem {
   
   // Item status
   isActive                Boolean        @default(true)
+  listingStatus           String?        // eBay listing status (Active/Ended/Completed/etc)
   isWon                   Boolean        @default(false)
   isPurchased             Boolean        @default(false)
   

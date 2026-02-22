@@ -504,6 +504,7 @@ export class EbaySyncService {
                 sellerRating: ebayItem.seller?.feedbackScore,
                 isEbayImported: true,
                 isActive: isActive,
+                listingStatus: ebayItem.listingStatus || null,
                 lastCheckedAt: new Date(),
                 updatedAt: new Date(),
               },
@@ -524,6 +525,7 @@ export class EbaySyncService {
                 sellerRating: ebayItem.seller?.feedbackScore,
                 isEbayImported: true,
                 isActive: isActive,
+                listingStatus: ebayItem.listingStatus || null,
               },
             });
           }

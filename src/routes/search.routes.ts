@@ -306,6 +306,7 @@ router.get('/wishlist', requireAuth, async (req: Request, res: Response): Promis
         seller: item.seller,
         sellerRating: item.sellerRating,
         isActive: item.isActive,
+        listingStatus: item.listingStatus,
         isWon: item.isWon,
         isPurchased: item.isPurchased,
         isEbayImported: item.isEbayImported,
