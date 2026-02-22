@@ -454,6 +454,19 @@ export class EbaySyncService {
         }
       }
 
+      const ebayItemIds = watchlistItems
+        .map((item) => item.itemId)
+        .filter((itemId) => Boolean(itemId));
+
+      // Remove previously imported watchlist items that no longer exist on eBay
+      await prisma.wishlistItem.deleteMany({
+        where: {
+          userId,
+          isEbayImported: true,
+          ebayItemId: ebayItemIds.length > 0 ? { notIn: ebayItemIds } : undefined,
+        },
+      });
+
       // Upsert each watchlist item into database
       let syncedCount = 0;
       for (const ebayItem of watchlistItems) {
