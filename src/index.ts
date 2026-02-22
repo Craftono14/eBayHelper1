@@ -34,7 +34,19 @@ const port: number = parseInt(process.env.PORT || '10000', 10);
 let prisma: PrismaClient;
 
 // Middleware
-app.use(helmet()); // Security headers
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https://thumbs*.ebayimg.com', 'https://*.ebayimg.com', 'https://ebay.com', 'https://*.ebay.com'],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'", 'https://api.ebay.com', 'https://api.sandbox.ebay.com'],
+      },
+    },
+  })
+); // Security headers with CSP for external images
 app.use(
   cors({
     origin: (origin, callback) => {
