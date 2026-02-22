@@ -45,6 +45,7 @@ interface EbayWatchlistItem {
     value: string;
     currency: string;
   };
+  listingStatus?: string;
   seller?: {
     username: string;
     feedbackScore?: number;
@@ -477,6 +478,9 @@ export class EbaySyncService {
           const shippingCost = ebayItem.shippingCost
             ? parseFloat(ebayItem.shippingCost.value)
             : null;
+          const isActive = ebayItem.listingStatus
+            ? ebayItem.listingStatus.toLowerCase() === 'active'
+            : true;
 
           // Find existing item or create new one
           const existingItem = await prisma.wishlistItem.findFirst({
@@ -499,7 +503,7 @@ export class EbaySyncService {
                 seller: ebayItem.seller?.username,
                 sellerRating: ebayItem.seller?.feedbackScore,
                 isEbayImported: true,
-                isActive: true,
+                isActive: isActive,
                 lastCheckedAt: new Date(),
                 updatedAt: new Date(),
               },
@@ -519,7 +523,7 @@ export class EbaySyncService {
                 seller: ebayItem.seller?.username,
                 sellerRating: ebayItem.seller?.feedbackScore,
                 isEbayImported: true,
-                isActive: true,
+                isActive: isActive,
               },
             });
           }
