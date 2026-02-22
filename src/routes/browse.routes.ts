@@ -75,6 +75,8 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    console.log('[browse] Search request:', { q, limit, offset });
+
     // Get app token for Browse API access
     const accessToken = await getEbayAppToken();
 
@@ -84,15 +86,22 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
 
     const response = await axios.get(browseUrl, {
       params: {
-        q: q,
-        limit: limit,
-        offset: offset,
+        q: q.toString(),
+        limit: Math.min(parseInt(limit as string) || 50, 200).toString(),
+        offset: offset.toString(),
       },
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Accept': 'application/json',
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
       },
+    });
+
+    console.log('[browse] eBay API response:', {
+      itemCount: response.data.itemSummaries?.length,
+      total: response.data.total,
+      offset: response.data.offset,
+      limit: response.data.limit,
     });
 
     const itemSummaries = response.data.itemSummaries || [];
