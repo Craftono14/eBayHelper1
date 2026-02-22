@@ -17,6 +17,14 @@ const prisma = new PrismaClient();
 
 // Middleware to extract and validate user ID
 const requireUserId = (req: Request, res: Response, next: Function): void => {
+  const authHeader = req.headers.authorization || '';
+  const hasBearerToken = authHeader.startsWith('Bearer ');
+  const hasTokenQuery = typeof req.query.token === 'string' && req.query.token.length > 0;
+
+  if (hasBearerToken || hasTokenQuery) {
+    return next();
+  }
+
   const userId = req.headers['x-user-id'] as string;
 
   if (!userId || isNaN(parseInt(userId))) {
