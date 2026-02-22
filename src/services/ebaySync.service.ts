@@ -739,7 +739,8 @@ export class EbaySyncService {
         let categoryId = this.extractXmlValue(searchXml, 'CategoryID');
         if (!categoryId && searchQuery) {
           // Extract category from _sacat parameter in SearchQuery URL
-          const sacatMatch = searchQuery.match(/[?&]_sacat=(\d+)/);
+          // Note: URLs in XML have &amp; instead of & so we need to handle both
+          const sacatMatch = searchQuery.match(/[?&](?:amp;)?_sacat=(\d+)/);
           if (sacatMatch) {
             categoryId = sacatMatch[1];
             console.log(`[EbaySyncService] Extracted category ${categoryId} from SearchQuery URL for "${searchName}"`);
