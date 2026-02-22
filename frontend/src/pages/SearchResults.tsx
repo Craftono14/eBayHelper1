@@ -47,7 +47,7 @@ export const SearchResults: React.FC = () => {
   const token = localStorage.getItem('token');
 
   // Map eBay SavedSearch sortBy values to Browse API sort format
-  const mapSortToBrowseAPI = (savedSearchSort: string | null): string => {
+  const mapSortToBrowseAPI = (savedSearchSort: string | null, sortOrder?: string | null): string => {
     if (!savedSearchSort) {
       console.log('[SearchResults] No sort preference specified, using default (Best Match)');
       return '';
@@ -69,6 +69,12 @@ export const SearchResults: React.FC = () => {
       'CurrentPriceHighest': '-price',     // Highest price first
       'PriceHighest': '-price',            // Highest price first
       
+      // Price plus shipping - depends on sort order
+      'PricePlusShipping': sortOrder === 'Descending' ? '-price' : 'price',  // Use sort order to determine direction
+      
+      // Location-based sorting - not directly supported by Browse API
+      'Distance': '',                      // No direct equivalent in Browse API, default to Best Match
+      
       // Default/best match
       'BestMatch': '',                     // Empty string = use default/best match
       '': '',                              // Empty = default
@@ -76,7 +82,7 @@ export const SearchResults: React.FC = () => {
     
     const mappedSort = sortMap[savedSearchSort];
     if (mappedSort !== undefined) {
-      console.log('[SearchResults] Mapped sort:', { ebaySort: savedSearchSort, browseAPISort: mappedSort || 'default (Best Match)' });
+      console.log('[SearchResults] Mapped sort:', { ebaySort: savedSearchSort, sortOrder: sortOrder || 'N/A', browseAPISort: mappedSort || 'default (Best Match)' });
       return mappedSort;
     }
     
@@ -106,7 +112,7 @@ export const SearchResults: React.FC = () => {
         setSearchQuery(search.searchKeywords);
         
         // Map the sort preference to Browse API format
-        const sortValue = mapSortToBrowseAPI(search.sortBy);
+        const sortValue = mapSortToBrowseAPI(search.sortBy, search.sortOrder);
         setSortParam(sortValue);
         console.log('[SearchResults] Sort mapping:', { 
           rawSortBy: search.sortBy,
