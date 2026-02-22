@@ -46,6 +46,7 @@ interface EbayWatchlistItem {
     currency: string;
   };
   listingStatus?: string;
+  timeLeft?: string;
   seller?: {
     username: string;
     feedbackScore?: number;
@@ -478,8 +479,9 @@ export class EbaySyncService {
           const shippingCost = ebayItem.shippingCost
             ? parseFloat(ebayItem.shippingCost.value)
             : null;
-          const isActive = ebayItem.listingStatus
-            ? ebayItem.listingStatus.toLowerCase() === 'active'
+          // Check if listing has ended using TimeLeft (PT0S = ended/zero seconds left)
+          const isActive = ebayItem.timeLeft 
+            ? ebayItem.timeLeft.toUpperCase() !== 'PT0S'
             : true;
 
           // Find existing item or create new one
@@ -578,6 +580,8 @@ export class EbaySyncService {
           this.extractXmlValue(itemXml, 'PictureDetails', 'PictureURL');
         const priceValue = this.extractXmlValue(itemXml, 'SellingStatus', 'CurrentPrice');
         const priceCurrency = this.extractXmlValue(itemXml, 'SellingStatus', 'CurrentPrice', 'currencyID');
+        const listingStatus = this.extractXmlValue(itemXml, 'SellingStatus', 'ListingStatus');
+        const timeLeft = this.extractXmlValue(itemXml, 'TimeLeft');
         const shippingValue = this.extractXmlValue(
           itemXml,
           'ShippingDetails',
@@ -605,6 +609,8 @@ export class EbaySyncService {
               value: priceValue,
               currency: priceCurrency || 'USD',
             } : undefined,
+            listingStatus: listingStatus,
+            timeLeft: timeLeft,
             shippingCost: shippingValue ? {
               value: shippingValue,
               currency: shippingCurrency || 'USD',
