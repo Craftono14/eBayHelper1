@@ -115,6 +115,19 @@ export class EbaySyncService {
         const savedSearches = this.parseSavedSearchesXML(response.data);
         console.log(`[EbaySyncService] Found ${savedSearches.length} saved searches`);
 
+        const ebaySearchIds = savedSearches
+          .map((search) => search.searchName)
+          .filter((searchName) => Boolean(searchName));
+
+        // Remove previously imported searches that no longer exist on eBay
+        await prisma.savedSearch.deleteMany({
+          where: {
+            userId,
+            isEbayImported: true,
+            ebaySearchId: ebaySearchIds.length > 0 ? { notIn: ebaySearchIds } : undefined,
+          },
+        });
+
         // Upsert each saved search into database
         let syncedCount = 0;
         for (const ebaySearch of savedSearches) {
@@ -206,6 +219,18 @@ export class EbaySyncService {
             });
 
             const savedSearches = this.parseSavedSearchesXML(retryResponse.data);
+            const ebaySearchIds = savedSearches
+              .map((search) => search.searchName)
+              .filter((searchName) => Boolean(searchName));
+
+            // Remove previously imported searches that no longer exist on eBay
+            await prisma.savedSearch.deleteMany({
+              where: {
+                userId,
+                isEbayImported: true,
+                ebaySearchId: ebaySearchIds.length > 0 ? { notIn: ebaySearchIds } : undefined,
+              },
+            });
             
             // Upsert saved searches (same logic as above)
             let syncedCount = 0;
