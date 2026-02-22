@@ -578,6 +578,12 @@ export class EbaySyncService {
         const imageUrl =
           this.extractXmlValue(itemXml, 'PictureDetails', 'GalleryURL') ||
           this.extractXmlValue(itemXml, 'PictureDetails', 'PictureURL');
+        
+        // Debug image extraction
+        if (!imageUrl && itemId) {
+          console.log(`[EbaySyncService] No image found for item ${itemId}: ${title?.substring(0, 50)}`);
+        }
+        
         const priceValue = this.extractXmlValue(itemXml, 'SellingStatus', 'CurrentPrice');
         const priceCurrency = this.extractXmlValue(itemXml, 'SellingStatus', 'CurrentPrice', 'currencyID');
         const listingStatus = this.extractXmlValue(itemXml, 'SellingStatus', 'ListingStatus');
@@ -686,8 +692,8 @@ export class EbaySyncService {
       if (attrMatch) return attrMatch[1];
     }
 
-    // Extract tag content
-    const tagRegex = new RegExp(`<${lastTag}[^>]*>([^<]*)<\/${lastTag}>`, 'i');
+    // Extract tag content - use non-greedy match to get content before closing tag
+    const tagRegex = new RegExp(`<${lastTag}[^>]*>([\\s\\S]*?)<\/${lastTag}>`, 'i');
     const match = currentXml.match(tagRegex);
     return match ? match[1].trim() : undefined;
   }
