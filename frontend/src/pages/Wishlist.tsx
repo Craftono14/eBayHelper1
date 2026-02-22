@@ -254,6 +254,7 @@ export const Wishlist: React.FC = () => {
                       alt={item.title || 'Wishlist item'}
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
                     />
                   ) : (
                     <span className="text-xs text-gray-500">No image</span>
