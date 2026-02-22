@@ -486,6 +486,7 @@ export class EbaySyncService {
                 seller: ebayItem.seller?.username,
                 sellerRating: ebayItem.seller?.feedbackScore,
                 isEbayImported: true,
+                isActive: true,
                 lastCheckedAt: new Date(),
                 updatedAt: new Date(),
               },

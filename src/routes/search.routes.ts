@@ -289,17 +289,22 @@ router.get('/wishlist', requireAuth, async (req: Request, res: Response): Promis
         title: item.itemTitle,
         itemUrl: item.itemUrl,
         itemImageUrl: item.itemImageUrl,
-        currentPrice: item.currentPrice,
-        shippingCost: item.shippingCost ?? item.priceHistory?.[0]?.shippingCost ?? null,
-        targetPrice: item.targetPrice,
+        currentPrice: item.currentPrice != null ? Number(item.currentPrice) : null,
+        shippingCost:
+          item.shippingCost != null
+            ? Number(item.shippingCost)
+            : item.priceHistory?.[0]?.shippingCost != null
+              ? Number(item.priceHistory?.[0]?.shippingCost)
+              : null,
+        targetPrice: item.targetPrice != null ? Number(item.targetPrice) : null,
         seller: item.seller,
         sellerRating: item.sellerRating,
         isActive: item.isActive,
         isWon: item.isWon,
         isPurchased: item.isPurchased,
         isEbayImported: item.isEbayImported,
-        lowestPrice: item.lowestPriceRecorded,
-        highestPrice: item.highestPriceRecorded,
+        lowestPrice: item.lowestPriceRecorded != null ? Number(item.lowestPriceRecorded) : null,
+        highestPrice: item.highestPriceRecorded != null ? Number(item.highestPriceRecorded) : null,
         search: item.search?.name,
         lastChecked: item.lastCheckedAt,
         addedAt: item.createdAt,
