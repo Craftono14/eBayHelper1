@@ -61,6 +61,7 @@ export const SearchResults: React.FC = () => {
       'EndTimeSoonest': 'endingSoonest',   // Alias
       'NewlyListed': 'newlyListed',        // Newly listed items first
       'RecentlyListed': 'newlyListed',     // Alias
+      'StartDate': 'newlyListed',          // Start date (newly listed items)
       
       // Price-based sorting
       'CurrentPriceLowest': 'price',       // Lowest price first
