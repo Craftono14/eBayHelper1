@@ -54,6 +54,7 @@ export const SearchResults: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortParam, setSortParam] = useState<string>('');
   const [filterParam, setFilterParam] = useState<string>('');
+  const [categoryIds, setCategoryIds] = useState<string>('');
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -190,6 +191,19 @@ export const SearchResults: React.FC = () => {
         const filterValue = buildFilterString(search);
         setFilterParam(filterValue);
         
+        // Parse and set category IDs
+        if (search.categories) {
+          try {
+            const cats = JSON.parse(search.categories);
+            if (Array.isArray(cats) && cats.length > 0) {
+              setCategoryIds(cats.join(','));
+              console.log('[SearchResults] Category IDs:', cats.join(','));
+            }
+          } catch (err) {
+            console.error('[SearchResults] Failed to parse categories:', err);
+          }
+        }
+        
         console.log('[SearchResults] Sort mapping:', { 
           rawSortBy: search.sortBy,
           mappedBrowseSort: sortValue,
@@ -213,13 +227,16 @@ export const SearchResults: React.FC = () => {
         setLoading(true);
         setError('');
 
-        // Build URL with sort and filter parameters
+        // Build URL with sort, filter, and category parameters
         let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${currentOffset}`;
         if (sortParam) {
           url += `&sort=${encodeURIComponent(sortParam)}`;
         }
         if (filterParam) {
           url += `&filter=${encodeURIComponent(filterParam)}`;
+        }
+        if (categoryIds) {
+          url += `&category_ids=${encodeURIComponent(categoryIds)}`;
         }
 
         const response = await fetch(url);
@@ -234,6 +251,7 @@ export const SearchResults: React.FC = () => {
           limit: data.limit,
           appliedSort: sortParam,
           appliedFilter: filterParam,
+          appliedCategories: categoryIds,
         });
         console.log('[SearchResults] Items received:', data.items);
         setItems(data.items || []);
@@ -247,7 +265,7 @@ export const SearchResults: React.FC = () => {
     };
 
     fetchItems();
-  }, [searchQuery, currentOffset, limit, sortParam, filterParam]);
+  }, [searchQuery, currentOffset, limit, sortParam, filterParam, categoryIds]);
 
   const getShippingCost = (item: ItemSummary): string => {
     try {
