@@ -64,18 +64,18 @@ async function getEbayAppToken(): Promise<string> {
 /**
  * GET /api/browse/search
  * Search for items using eBay Browse API
- * Query params: q (keywords), limit, offset
+ * Query params: q (keywords), limit, offset, sort
  */
 router.get('/search', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { q, limit = '50', offset = '0' } = req.query;
+    const { q, limit = '50', offset = '0', sort } = req.query;
 
     if (!q || typeof q !== 'string') {
       res.status(400).json({ error: 'Missing required query parameter: q' });
       return;
     }
 
-    console.log('[browse] Search request:', { q, limit, offset });
+    console.log('[browse] Search request:', { q, limit, offset, sort });
 
     // Get app token for Browse API access
     const accessToken = await getEbayAppToken();
@@ -84,12 +84,20 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
       ? 'https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search'
       : 'https://api.ebay.com/buy/browse/v1/item_summary/search';
 
+    const params: any = {
+      q: q.toString(),
+      limit: Math.min(parseInt(limit as string) || 50, 200).toString(),
+      offset: offset.toString(),
+    };
+
+    // Add sort parameter if provided
+    if (sort) {
+      params.sort = sort.toString();
+      console.log('[browse] Applied sort:', sort);
+    }
+
     const response = await axios.get(browseUrl, {
-      params: {
-        q: q.toString(),
-        limit: Math.min(parseInt(limit as string) || 50, 200).toString(),
-        offset: offset.toString(),
-      },
+      params,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Accept': 'application/json',

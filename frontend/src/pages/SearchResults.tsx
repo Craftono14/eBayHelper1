@@ -36,6 +36,7 @@ export const SearchResults: React.FC = () => {
   
   const [searchName, setSearchName] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortParam, setSortParam] = useState<string>('');
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -45,13 +46,29 @@ export const SearchResults: React.FC = () => {
 
   const token = localStorage.getItem('token');
 
+  // Map eBay SavedSearch sortBy values to Browse API sort format
+  const mapSortToBrowseAPI = (savedSearchSort: string | null): string => {
+    if (!savedSearchSort) return ''; // Use default (Best Match)
+    
+    const sortMap: Record<string, string> = {
+      'EndTime': 'endingSoonest',
+      'EndTimeSoonest': 'endingSoonest',
+      'NewlyListed': 'newlyListed',
+      'PriceLowest': 'price',
+      'PriceHighest': '-price',
+      'BestMatch': '', // Empty string = use default
+    };
+    
+    return sortMap[savedSearchSort] || '';
+  };
+
   // Fetch search details first
   useEffect(() => {
     if (!isLoggedIn || !searchId) return;
 
     const fetchSearchDetails = async () => {
       try {
-        const response = await fetch(`/api/searches/dashboard`, {
+        const response = await fetch(`/api/searches/${searchId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -59,15 +76,14 @@ export const SearchResults: React.FC = () => {
 
         if (!response.ok) throw new Error('Failed to fetch search details');
 
-        const data = await response.json();
-        const search = data.searches?.find((s: any) => s.id === parseInt(searchId));
+        const search = await response.json();
+        setSearchName(search.name);
+        setSearchQuery(search.searchKeywords);
         
-        if (search) {
-          setSearchName(search.name);
-          setSearchQuery(search.searchKeywords);
-        } else {
-          setError('Search not found');
-        }
+        // Map the sort preference to Browse API format
+        const sortValue = mapSortToBrowseAPI(search.sortBy);
+        setSortParam(sortValue);
+        console.log('[SearchResults] Sort preference:', { savedSort: search.sortBy, browseSort: sortValue });
       } catch (err) {
         console.error('Failed to fetch search details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load search');
@@ -86,9 +102,13 @@ export const SearchResults: React.FC = () => {
         setLoading(true);
         setError('');
 
-        const response = await fetch(
-          `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${currentOffset}`
-        );
+        // Build URL with sort parameter if available
+        let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${currentOffset}`;
+        if (sortParam) {
+          url += `&sort=${encodeURIComponent(sortParam)}`;
+        }
+
+        const response = await fetch(url);
 
         if (!response.ok) throw new Error('Failed to fetch items');
 
@@ -98,8 +118,9 @@ export const SearchResults: React.FC = () => {
           total: data.total,
           offset: data.offset,
           limit: data.limit,
+          appliedSort: sortParam,
         });
-        console.log('[SearchResults] Items received:', data.items); // Log ALL items, not just first 3
+        console.log('[SearchResults] Items received:', data.items);
         setItems(data.items || []);
         setTotal(data.total || 0);
       } catch (err) {
@@ -111,7 +132,7 @@ export const SearchResults: React.FC = () => {
     };
 
     fetchItems();
-  }, [searchQuery, currentOffset, limit]);
+  }, [searchQuery, currentOffset, limit, sortParam]);
 
   const getShippingCost = (item: ItemSummary): string => {
     try {

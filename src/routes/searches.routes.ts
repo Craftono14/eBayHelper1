@@ -35,6 +35,41 @@ router.get('/dashboard', requireAuth, async (req: Request, res: Response): Promi
   }
 });
 
+// GET /api/searches/:id - Get a specific saved search with full details including sort
+router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<any> => {
+  try {
+    const userId = (req as any).user?.id;
+    const searchId = parseInt(req.params.id);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const search = await (prisma.savedSearch as any).findFirst({
+      where: { id: searchId, userId },
+    });
+
+    if (!search) {
+      return res.status(404).json({ error: 'Search not found' });
+    }
+
+    res.json({
+      id: search.id,
+      name: search.name,
+      searchKeywords: search.searchKeywords,
+      sortBy: search.sortBy,
+      sortOrder: search.sortOrder,
+      buyingFormat: search.buyingFormat,
+      minPrice: search.minPrice,
+      maxPrice: search.maxPrice,
+      condition: search.condition,
+    });
+  } catch (error) {
+    console.error('[searches] get by id error', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/searches/import-ebay - Sync user's eBay saved searches
 router.post('/import-ebay', requireAuth, async (req: Request, res: Response): Promise<any> => {
   try {
