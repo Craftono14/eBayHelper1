@@ -1,0 +1,1647 @@
+/item_summary/search
+
+This method searches for eBay items by various query parameters and retrieves summaries of the items. You can search by keyword, category, eBay product ID (ePID), or GTIN, charity ID, or a combination of these.
+
+Note: Only listings where FIXED_PRICE (Buy It Now) is a buying option are returned by default. To retrieve listings that do not have FIXED_PRICE as a buying option, the buyingOptions filter can be used to retrieve those listings.
+
+Note that an auction listing enabled with the Buy it Now feature will initially show AUCTION and FIXED_PRICE as buying options, but if/when that auction listing receives a qualifying bid, only AUCTION remains as a buying option. If this happens, the buyingOptions filter would need to be used to retrieve that auction listing.
+
+This method also supports the following:
+Filtering by the value of one or multiple fields, such as listing format, item condition, price range, location, and more. For the fields supported by this method, refer to the filter parameter.
+Retrieving the refinements (metadata) of an item, such as item aspects (color, brand) condition, category, etc. using the fieldgroups parameter.
+Filtering by item aspects and other refinements using the aspect_filter parameter.
+Filtering for items that are compatible with a specific product, using the compatibility_filter parameter.
+Creating aspects histograms, which enables shoppers to drill down in each refinement narrowing the search results.
+For additional information and examples of these capabilities, refer to Browse API in the Buying Integration Guide.
+Pagination and sort controls
+There are pagination controls (limit and offset fields) and sort query parameters that control/sort the data that are returned. By default, results are sorted by Best Match. For more information about Best Match, refer to Best Match.
+Restrictions
+This method can return a maximum of 10,000 items. For a list of supported sites and other restrictions, refer to API Restrictions.
+
+eBay Partner Network: In order to receive a commission for your sales, you must use the URL returned in the itemAffiliateWebUrl field to forward your buyer to the ebay.com site.
+
+Input
+Resource URI
+GET https://api.ebay.com/buy/browse/v1/item_summary/search?
+q=string&
+gtin=string&
+charity_ids=string&
+fieldgroups=string&
+compatibility_filter=CompatibilityFilter&
+auto_correct=string&
+category_ids=string&
+filter=FilterField&
+sort=SortField&
+limit=string&
+offset=string&
+aspect_filter=AspectFilter&
+epid=string&
+This method is supported in Sandbox environment. To access the endpoint, just replace the api.ebay.com root URI with api.sandbox.ebay.com
+
+URI parameters
+Parameter	Type	Description
+q	string	A string consisting of one or more keywords used to search for items on eBay.
+
+Note: The * wildcard character is not allowed in this field.
+
+When providing two or more keywords in a single query, the string is processed as follows:
+When successive keywords are separated by a space, the list of keywords is processed as an AND request. For example, to retrieve items that include both of the keywords iphone AND ipad, submit the following query:
+/buy/browse/v1/item_summary/search?q=iphone ipad
+When successive keywords are comma-separated and surrounded by a single pair of parentheses, OR if the keywords are each URL-encoded, the list of keywords is processed as an OR request. For example, to retrieve items that include iphone OR ipad, submit one of the following queries:
+/buy/browse/v1/item_summary/search?q=(iphone, ipad)
+/buy/browse/v1/item_summary/search?q=%28iphone%2c%20ipad%29
+
+Note: When specifying keywords using the q parameter:
+Do not include an epid or gtin parameter value as neither can be used in conjunction with a keyword search.
+Strings longer than 100-characters are truncated.
+
+
+Maximum length: 100 characters
+Occurrence: Conditional
+
+gtin	string	This field lets you search for a product by specifying a Global Trade Item Number (GTIN) of the product. Supported GTIN types are UPC, EAN, and ISBN.
+
+For example:
+/buy/browse/v1/item_summary/search?gtin=099482432621
+Note: When constructing a query, gtin value may be combined with an epid value, but neither an epid or gtin value should be combined with a keywords search through the q parameter.
+Occurrence: Conditional
+
+charity_ids	array of string	The charity ID filters results to return only those items associated with the specified charity.
+
+Note: charity_ids is only supported by the US and UK marketplaces.
+
+Charity ID is a charity's unique identification number:
+In the US, this is the Employer Identification Number (EIN).
+In the UK, this is the Charity Registration Number (CRN), commonly called Charity Number.
+
+charity_ids may be retrieved/determined as follows:
+Search for a supported charity using the Charity API's getCharityOrgs method.
+
+Important! The value to be passed in as charity_ids is that returned in the registrationId field.
+
+Search for a supported charity by visiting Charity Search. Click on the charity's name to display its information. The EIN number is included in the charity's information block at the top of the page.
+
+For example, the charity ID for American Red Cross, is 530196605.
+Up to 20 comma-separated charity_ids may be specified in each query. Additionally, charity_ids may be combined with category_ids and/or q keyword values to further filter returned results.
+
+A sample query using charity_ids is:
+/buy/browse/v1/item_summary/search?charity_ids=13-1788491,300108469
+Occurrence: Optional
+
+fieldgroups	array of string	A comma-separated list of values that controls what is returned in the response. The default is MATCHING_ITEMS, which returns the items that match the keyword or category specified. The other values return data that can be used to create histograms or provide additional information.
+
+Valid Values:
+ASPECT_REFINEMENTS
+This field group adds the aspectDistributions container to the response.
+
+Note: Information returned by ASPECT_REFINEMENTS is category specific.
+BUYING_OPTION_REFINEMENTS
+This field group adds the buyingOptionDistributions container to the response.
+CATEGORY_REFINEMENTS
+This field group adds the categoryDistributions container to the response.
+CONDITION_REFINEMENTS
+This field group adds the conditionDistributions containers, such as NEW, USED, etc., to the response. Within these groups are multiple states of the condition.
+
+For example, NEW can be New without tag, New in box, New without box, etc.
+EXTENDED
+This field group adds the following fields to the response:
+shortDescription
+itemLocation.city
+MATCHING_ITEMS (default value)
+This field group is intended to be used with one or more of the refinement values listed above. This is used to return the specified refinements and all matching items.
+FULL
+This field group returns all refinement containers and all matching items.
+Default: MATCHING_ITEMS
+Occurrence: Optional
+
+compatibility_filter	CompatibilityFilter	This field specifies the attributes used to define a specific product. The service searches for items matching the keyword, or matching the keyword and a product attribute value in the title of the item.
+
+Note: The only products supported are cars, trucks, and motorcycles.
+
+For example, if the keyword is brakes and compatibility-filter=Year:2018;Make:BMW, the items returned are items with brakes, 2018, or BMW in the title.
+
+The service uses the product attributes to determine whether the item is compatible. The service returns the attributes that are compatible and the CompatibilityMatchEnum value that indicates how well the item matches the attributes.
+
+Tip: Refer to the Samples section for a detailed example.
+
+
+Best Practice: Submit all of the product attributes for the specific product.
+
+To find the attributes and values for a specific marketplace, use the getCompatibilityProperties method in the Taxonomy API.
+
+For more information, refer to Check compatibility in the Buying Integration Guide.
+
+Note: Testing in Sandbox is only supported using mock data. Refer to Testing search in the Sandbox for details.
+
+Required:
+q (keyword)
+One parts-compatibility-supported category ID (such as 33559 Brakes)
+At least one vehicle attribute name/value pair
+Occurrence: Optional
+
+auto_correct	array of string	A query parameter that enables auto correction.
+
+A sample is shown below:
+/buy/browse/v1/item_summary/search?auto_correct=KEYWORD
+Note: Auto correction is currently supported in the following marketplaces:
+United States
+Austria
+Australia
+Canada
+Switzerland
+Germany
+Spain
+France
+United Kingdom
+Ireland
+Italy
+
+Valid Values: KEYWORD
+Occurrence: Optional
+
+category_ids	array of string	The category ID is used to limit the results that are returned. This field may pass in one category ID or a comma separated list of IDs as illustrated in the following examples:
+/buy/browse/v1/item_summary/search?category_ids=29792
+/buy/browse/v1/item_summary/search?category_ids=267,29792
+Note: Currently, you can pass in only one category ID per request.
+
+To refine the set of information that is returned, category_ids may be combined with EITHER:
+epid and/or gtin values
+q keywords
+For example, when looking of a toy phone, simply searching for "phone" will return mobile phones because that is the "Best Match" for the search. To further refine the request to include toy phones, include the Toys & Hobbies category ID as illustrated here:
+/buy/browse/v1/item_summary/search?q=phone&category_ids=220
+Because the list of eBay category IDs is not published and category IDs are not the same across all eBay marketplaces, category IDs may be determined by:
+Visiting the Category Changes page
+Using the Taxonomy API. Refer to Get Categories for Buy APIs for complete information.
+Issuing the following call to retrieve the dominantCategoryId for an item:
+/buy/browse/v1/item_summary/search?q= keyword&fieldgroups=ASPECT_REFINEMENTS
+Note: If a top-level (L1) category is specified, you must also include a q query parameter.
+Occurrence: Optional
+
+filter	array of FilterField	An array of field filters that can be used to limit/customize the result set.
+
+Refer to Buy API Field Filters for additional information and examples of all supported filters.
+
+For example, to filter shirts based on a specific range of prices, include the filter illustrated here:
+/buy/browse/v1/item_summary/search?q=shirt&filter=price:[10..50]
+Filters may also be combined within a single request as illustrated in the sample below which further refines results to return only those shirts available from specific sellers:
+/buy/browse/v1/item_summary/search?q=shirt&filter=price:[10..50],sellers:{rpseller|bigSal}
+Occurrence: Optional
+
+sort	array of SortField	Specifies the criteria on which returned items are to be sorted.
+
+Items can be sorted in ascending order based on:
+Price (sort=price)
+Returned items are sorted based on their total cost (i.e., price + shipping cost).
+
+Items with the lowest combined price are shown first.
+
+When sorting by price, it is highly recommended that:
+The X-EBAY-C-ENDUSERCTX request header is used, and
+The contextualLocation parameter specifies the delivery country and postal code.
+
+These values must be URL-encoded.
+Refer to the following example:
+X-EBAY-C-ENDUSERCTX: contextualLocation=country%3DUS%2Czip%3D19406
+Descending price order
+To sort items from highest price to lowest price insert a minus sign (-) before price as the search criterion:
+sort=-price
+Distance (sort=distance)
+Returned items are sorted based on their distance from the buyer's location.
+
+Items that are closest to the buyer are listed first.
+
+Important! When sorting by distance, all required pickup filters must be included in the request.
+
+Date
+Items can be sorted by date based on:
+Listing date (sort=newlyListed)
+Returned items are sorted based on their itemOriginDate.
+
+Newly listed items are shown first.
+End date (sort=endingSoonest)
+Returned items are sorted based on the date/time on which their listing is scheduled to end.
+
+Items that are closest to their scheduled ending date/time are shown first.
+If no sort parameter is submitted, the result set is sorted by "Best Match". Refer to Optimizing your listings for Best Match for additional information.
+Occurrence: Optional
+
+limit	string	The number of items from the result set returned in a single page.
+
+Note: If a value is set in the limit field, the value of offset must be either zero or a multiple of the limit value. An error is returned for invalid offset values.
+
+Note: This method can return a maximum of 10,000 items in one results set.
+
+Min: 1
+
+Max: 200
+
+Default: 50
+Occurrence: Optional
+
+offset	string	Specifies the number of items to skip in the result set. This is used with the limit field to control the pagination of the output.
+
+For example:
+If offset is 0 and limit is 10, the method will retrieve items 1-10 from the list of items returned
+If offset is 10 and limit is 10, the method will retrieve items 11-20 from the list of items returned.
+Note: The value of offset must be either zero or a multiple of the value set in the limit field. An error is returned for invalid offset values.
+
+Note: This method can return a maximum of 10,000 items in one results set.
+
+Min: 0
+
+Max: 9,999
+
+Default: 0
+Occurrence: Optional
+
+aspect_filter	AspectFilter	This field lets you filter by item aspects. The aspect name/value pairs and category, which is required, is used to limit the results to specific aspects of the item. For example, in a clothing category one aspect pair would be Color/Red.
+
+Note: The category ID must be specified twice:
+Once as a URI parameter in the category_ids field
+Once as part of the aspect_filter field
+These two values must be the same.
+
+For example, to return items for a woman's red shirt, issue the following request:
+/buy/browse/v1/item_summary/search?q=shirt&category_ids=15724&aspect_filter=categoryId:15724,Color:{Red}
+To get a list of the aspect pairs and the category, which is returned in the dominantCategoryId field, set fieldgroups to ASPECT_REFINEMENTS as illustrated here:
+/buy/browse/v1/item_summary/search?q=shirt&fieldgroups=ASPECT_REFINEMENTS
+Note: The pipe symbol is used as a delimiter between aspect filter values. If a value contains a pipe symbol (for example, the brand name 'Bed|Stü'), you must enter a backslash before the pipe character to prevent it from being evaluated as a delimiter.
+
+The following example illustrates the correct format for entering two brand names as aspect filter values, one of which contains a pipe symbol:
+/buy/browse/v1/item_summary/search?limit=50&category_ids=3034&filter=buyingOptions:{AUCTION|FIXED_PRICE}&aspect_filter=categoryId:3034,Brand:{Bed\|Stü|Nike}
+Occurrence: Optional
+
+epid	string	The ePID is the eBay product identifier of a product from the eBay product catalog. This field limits the results to only items in the specified ePID.
+
+Use the product_summary/search method in the Catalog API to search for the ePID of the product.
+
+For example:
+/buy/browse/v1/item_summary/search?epid=15032
+Note: When constructing a query, epid may be combined with a gtin value. However, do not specify keywords using the q parameter — keywords cannot be used in conjunction with an epid.
+Occurrence: Conditional
+
+HTTP request headers
+All requests made to eBay REST operations require you to provide the Authorization HTTP header for authentication authorization.
+
+The table below shows additional HTTP request headers that are either required, conditionally required, or strongly recommended for this method. Other standard HTTP request headers- opens rest request components page (not in this table) can also be used, but they are optional.
+
+Header	Type	Description
+Accept-Language	string	This header is used to indicate the natural language and locale preferred by the user for the response.
+
+This header is required when targeting a specific locale of a marketplace that supports multiple locales. For example:
+When targeting the French locale of the Belgium marketplace, it is required to pass in fr-BE to specify this. If this locale is not specified, the language will default to Dutch.
+When targeting the French locale of the Canadian marketplace, it is required to pass in fr-CA to specify this. If this locale is not specified, the language will default to English.
+Occurrence: Conditional
+
+X-EBAY-C-ENDUSERCTX	string	This header is required to support revenue sharing for eBay Partner Network and to improve the accuracy of shipping and delivery time estimations.
+
+For additional information, refer to Use request headers in the Buying Integration Guide.
+Occurrence: Optional
+
+X-EBAY-C-MARKETPLACE-ID	string	This header identifies the seller's eBay marketplace. It is required for all marketplaces outside of the US.
+
+Note: If the marketplace ID value is invalid or missing, the default value of EBAY_US is used.
+
+See MarketplaceIdEnum for a list of supported marketplaces.
+
+Default: EBAY_US
+Occurrence: Strongly Recommended
+
+OAuth scope
+This request requires an access token created with the client credentials grant flow, using one or more scopes from the following list (please check your Application Keys page for a list of OAuth scopes available to your application):
+
+https://api.ebay.com/oauth/api_scope
+
+See OAuth access tokens for more information.
+
+Request payload
+This call has no payload.
+
+Request fields
+This call has no field definitions.
+
+Output
+HTTP response headers
+This call has no response headers.
+
+Response payload
+ Copy complete valid JSON to clipboard
+{ /* SearchPagedCollection<ItemSummary> */
+"autoCorrections" :
+{ /* AutoCorrections */
+"q" : "string"
+},
+"href" : "string",
+"itemSummaries" : [
+{ /* ItemSummary */
+"additionalImages" : [
+{ /* Image */
+"height" : "integer",
+"imageUrl" : "string",
+"width" : "integer"
+}
+],
+"adultOnly" : "boolean",
+"availableCoupons" : "boolean",
+"bidCount" : "integer",
+"buyingOptions" : [
+"string"
+],
+"categories" : [
+{ /* Category */
+"categoryId" : "string",
+"categoryName" : "string"
+}
+],
+"compatibilityMatch" : "CompatibilityMatchEnum : [EXACT,POSSIBLE]",
+"compatibilityProperties" : [
+{ /* CompatibilityProperty */
+"localizedName" : "string",
+"name" : "string",
+"value" : "string"
+}
+],
+"condition" : "string",
+"conditionId" : "string",
+"currentBidPrice" :
+{ /* ConvertedAmount */
+"convertedFromCurrency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"convertedFromValue" : "string",
+"currency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"value" : "string"
+},
+"distanceFromPickupLocation" :
+{ /* TargetLocation */
+"unitOfMeasure" : "string",
+"value" : "string"
+},
+"energyEfficiencyClass" : "string",
+"epid" : "string",
+"image" :
+{ /* Image */
+"height" : "integer",
+"imageUrl" : "string",
+"width" : "integer"
+},
+"itemAffiliateWebUrl" : "string",
+"itemCreationDate" : "string",
+"itemEndDate" : "string",
+"itemGroupHref" : "string",
+"itemGroupType" : "string",
+"itemHref" : "string",
+"itemId" : "string",
+"itemLocation" :
+{ /* ItemLocationImpl */
+"addressLine1" : "string",
+"addressLine2" : "string",
+"city" : "string",
+"country" : "CountryCodeEnum : [AD,AE,AF...]",
+"county" : "string",
+"postalCode" : "string",
+"stateOrProvince" : "string"
+},
+"itemOriginDate" : "string",
+"itemWebUrl" : "string",
+"leafCategoryIds" : [
+"string"
+],
+"legacyItemId" : "string",
+"listingMarketplaceId" : "MarketplaceIdEnum : [EBAY_AU,EBAY_AT,EBAY_BE...]",
+"marketingPrice" :
+{ /* MarketingPrice */
+"discountAmount" :
+{ /* ConvertedAmount */
+"convertedFromCurrency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"convertedFromValue" : "string",
+"currency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"value" : "string"
+},
+"discountPercentage" : "string",
+"originalPrice" :
+{ /* ConvertedAmount */
+"convertedFromCurrency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"convertedFromValue" : "string",
+"currency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"value" : "string"
+},
+"priceTreatment" : "PriceTreatmentEnum : [MINIMUM_ADVERTISED_PRICE,LIST_PRICE,MARKDOWN]"
+},
+"pickupOptions" : [
+{ /* PickupOptionSummary */
+"pickupLocationType" : "string"
+}
+],
+"price" :
+{ /* ConvertedAmount */
+"convertedFromCurrency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"convertedFromValue" : "string",
+"currency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"value" : "string"
+},
+"priceDisplayCondition" : "PriceDisplayConditionEnum : [ONLY_SHOW_WHEN_ADDED_IN_CART,ONLY_SHOW_ON_REQUEST,ALWAYS_SHOW]",
+"priorityListing" : "boolean",
+"qualifiedPrograms" : [
+"string"
+],
+"seller" :
+{ /* Seller */
+"feedbackPercentage" : "string",
+"feedbackScore" : "integer",
+"sellerAccountType" : "string",
+"username" : "string"
+},
+"shippingOptions" : [
+{ /* ShippingOptionSummary */
+"guaranteedDelivery" : "boolean",
+"maxEstimatedDeliveryDate" : "string",
+"minEstimatedDeliveryDate" : "string",
+"shippingCost" :
+{ /* ConvertedAmount */
+"convertedFromCurrency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"convertedFromValue" : "string",
+"currency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"value" : "string"
+},
+"shippingCostType" : "string"
+}
+],
+"shortDescription" : "string",
+"thumbnailImages" : [
+{ /* Image */
+"height" : "integer",
+"imageUrl" : "string",
+"width" : "integer"
+}
+],
+"title" : "string",
+"topRatedBuyingExperience" : "boolean",
+"tyreLabelImageUrl" : "string",
+"unitPrice" :
+{ /* ConvertedAmount */
+"convertedFromCurrency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"convertedFromValue" : "string",
+"currency" : "CurrencyCodeEnum : [AED,AFN,ALL...]",
+"value" : "string"
+},
+"unitPricingMeasure" : "string",
+"watchCount" : "integer"
+}
+],
+"limit" : "integer",
+"next" : "string",
+"offset" : "integer",
+"prev" : "string",
+"refinement" :
+{ /* Refinement */
+"aspectDistributions" : [
+{ /* AspectDistribution */
+"aspectValueDistributions" : [
+{ /* AspectValueDistribution */
+"localizedAspectValue" : "string",
+"matchCount" : "integer",
+"refinementHref" : "string"
+}
+],
+"localizedAspectName" : "string"
+}
+],
+"buyingOptionDistributions" : [
+{ /* BuyingOptionDistribution */
+"buyingOption" : "string",
+"matchCount" : "integer",
+"refinementHref" : "string"
+}
+],
+"categoryDistributions" : [
+{ /* CategoryDistribution */
+"categoryId" : "string",
+"categoryName" : "string",
+"matchCount" : "integer",
+"refinementHref" : "string"
+}
+],
+"conditionDistributions" : [
+{ /* ConditionDistribution */
+"condition" : "string",
+"conditionId" : "string",
+"matchCount" : "integer",
+"refinementHref" : "string"
+}
+],
+"dominantCategoryId" : "string"
+},
+"total" : "integer",
+"warnings" : [
+{ /* ErrorDetailV3 */
+"category" : "string",
+"domain" : "string",
+"errorId" : "integer",
+"inputRefIds" : [
+"string"
+],
+"longMessage" : "string",
+"message" : "string",
+"outputRefIds" : [
+"string"
+],
+"parameters" : [
+{ /* ErrorParameterV3 */
+"name" : "string",
+"value" : "string"
+}
+],
+"subdomain" : "string"
+}
+]
+}
+Response fields
+Output container/field	Type	Description
+autoCorrections	AutoCorrections	
+The auto-corrected inputs.
+Occurrence: Conditional
+
+
+autoCorrections.q	string	
+The automatically spell-corrected keyword from the request.
+Occurrence: Conditional
+
+
+href	string	
+The URI of the current page of results.
+
+The following example of the search method returns items 1 thru 5 from the list of items found.
+https://api.ebay.com/buy/v1/item_summary/search?q=shirt&limit=5&offset=0
+Occurrence: Always
+
+
+itemSummaries	array of ItemSummary	
+An array of the items on this page. The items are sorted according to the sorting method specified in the request.
+Occurrence: Conditional
+
+
+itemSummaries.additionalImages	array of Image	
+An array of containers with the URLs for the images that are in addition to the primary image. The primary image is returned in the image.imageUrl field.
+Occurrence: Conditional
+
+
+itemSummaries.additionalImages.height	integer	
+Reserved for future use.
+Occurrence: Conditional
+
+
+itemSummaries.additionalImages.imageUrl	string	
+The URL of the image.
+Occurrence: Conditional
+
+
+itemSummaries.additionalImages.width	integer	
+Reserved for future use.
+Occurrence: Conditional
+
+
+itemSummaries.adultOnly	boolean	
+This indicates if the item is for adults only. For more information about adult-only items on eBay, refer to the Adult items policy.
+Occurrence: Conditional
+
+
+itemSummaries.availableCoupons	boolean	
+This boolean attribute indicates if coupons are available for the item.
+
+Note: The Browse API only acknowledges item-level coupons. This field will only be returned as true if a coupon is linked with an item. It does not recognize store-level coupons offered by sellers across their entire store.
+Occurrence: Conditional
+
+
+itemSummaries.bidCount	integer	
+This integer value indicates the total number of bids that have been placed for an auction item. This field is only returned for auction items.
+Occurrence: Conditional
+
+
+itemSummaries.buyingOptions	array of string	
+A comma separated list of all the purchase options available for the item.
+
+Values Returned:
+FIXED_PRICE
+Indicates the buyer can purchase the item for a set price using the Buy It Now button.
+AUCTION
+Indicates the buyer can place a bid for the item. After the first bid is placed, this becomes a live auction item and is the only buying option for this item.
+BEST_OFFER
+Items where the buyer can send the seller a price they are willing to pay for the item. The seller can accept, reject, or send a counter offer. For additional information about Best Offer, refer to Adding Best Offer to your listing and sending offers to buyers.
+CLASSIFIED_AD
+Indicates that the final sales transaction is to be completed outside of the eBay environment.
+Occurrence: Conditional
+
+
+itemSummaries.categories	array of Category	
+This array returns the name and ID of each category associated with the item, including top level, branch, and leaf categories.
+Occurrence: Conditional
+
+
+itemSummaries.categories.categoryId	string	
+The unique identifier of the category.
+Occurrence: Conditional
+
+
+itemSummaries.categories.categoryName	string	
+The name of the category.
+Occurrence: Conditional
+
+
+itemSummaries.compatibilityMatch	CompatibilityMatchEnum	
+This indicates how well an item matches the compatibility_filter product attributes.
+
+Valid Values:
+EXACT
+POSSIBLE
+Occurrence: Conditional
+
+
+itemSummaries.compatibilityProperties	array of CompatibilityProperty	
+This container returns only the product attributes that are compatible with the item. These attributes were specified in the compatibility_filter in the request. This means that if you passed in 5 attributes and only 4 are compatible, only those 4 are returned. If none of the attributes are compatible, this container is not returned.
+Occurrence: Conditional
+
+
+itemSummaries.compatibilityProperties.localizedName	string	
+The name of the product attribute that as been translated to the language of the site.
+Occurrence: Conditional
+
+
+itemSummaries.compatibilityProperties.name	string	
+The name of the product attribute, such as Make, Model, Year, etc.
+Occurrence: Conditional
+
+
+itemSummaries.compatibilityProperties.value	string	
+The value for the name attribute, such as BMW, R1200GS, 2011, etc.
+Occurrence: Conditional
+
+
+itemSummaries.condition	string	
+The text describing the condition of the item, such as New or Used. For a list of condition names, refer to Item Condition IDs and Names.
+Occurrence: Conditional
+
+
+itemSummaries.conditionId	string	
+The identifier of the condition of the item. For example, 1000 is the identifier for NEW. For a list of condition names and IDs, refer to Item Condition IDs and Names.
+Occurrence: Conditional
+
+
+itemSummaries.currentBidPrice	ConvertedAmount	
+This container returns the current highest bid for an auction item. The value field shows the dollar value of the current highest bid, and the currency field (3-digit ISO code) denotes the currency associated with that bid value. This field is only returned for auction items.
+Occurrence: Conditional
+
+
+itemSummaries.currentBidPrice.convertedFromCurrency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the convertedFromValue field. This value is required or returned only if currency conversion/localization is required, and represents the pre-conversion currency.
+Occurrence: Conditional
+
+
+itemSummaries.currentBidPrice.convertedFromValue	string	
+The monetary amount before any conversion is performed, in the currency specified by the convertedFromCurrency field. This value is required or returned only if currency conversion/localization is required. The value field contains the converted amount of this value, in the currency specified by the currency field.
+Occurrence: Conditional
+
+
+itemSummaries.currentBidPrice.currency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the value field. If currency conversion/localization is required, this is the post-conversion currency of the amount in the value field.
+
+Default: The currency of the authenticated user's country.
+Occurrence: Conditional
+
+
+itemSummaries.currentBidPrice.value	string	
+The monetary amount in the currency specified by the currency field. If currency conversion/localization is required, this value is the converted amount, and the convertedFromValue field contains the amount in the original currency.
+Occurrence: Conditional
+
+
+itemSummaries.distanceFromPickupLocation	TargetLocation	
+This container returns the distance away that the item is from the pickupPostalCode value that was supplied in the method request. This container is only returned if the "local pickup" filter fields are used in the request.
+Occurrence: Conditional
+
+
+itemSummaries.distanceFromPickupLocation.unitOfMeasure	string	
+This value shows the unit of measurement used to measure the distance between the location of the item and the buyer's location. This value is typically mi or km.
+Occurrence: Conditional
+
+
+itemSummaries.distanceFromPickupLocation.value	string	
+This value indicates the distance (measured in the measurement unit in the unitOfMeasure field) between the item location and the buyer's location.
+Occurrence: Conditional
+
+
+itemSummaries.energyEfficiencyClass	string	
+This indicates the European energy efficiency rating (EEK) of the item. Energy efficiency ratings apply to products listed by commercial vendors in electronics categories only.
+
+Currently, this field is only applicable for the Germany site, and is returned only if the seller specifies the energy efficiency rating through item specifics at listing time. Rating values include A+++, A++, A+, A, B, C, D, E, F, and G.
+Occurrence: Conditional
+
+
+itemSummaries.epid	string	
+An ePID is the eBay product identifier of a product from the eBay product catalog. This indicates the product in which the item belongs.
+Occurrence: Conditional
+
+
+itemSummaries.image	Image	
+The URL to the primary image of the item.
+Occurrence: Conditional
+
+
+itemSummaries.image.height	integer	
+Reserved for future use.
+Occurrence: Conditional
+
+
+itemSummaries.image.imageUrl	string	
+The URL of the image.
+Occurrence: Conditional
+
+
+itemSummaries.image.width	integer	
+Reserved for future use.
+Occurrence: Conditional
+
+
+itemSummaries.itemAffiliateWebUrl	string	
+The URL to the View Item page of the item which includes the affiliate tracking ID.
+
+Note: In order to receive commissions on sales, eBay Partner Network affiliates must use this URL to forward buyers to the listing on the eBay marketplace.
+
+The itemAffiliateWebUrl is returned only if:
+The marketplace through which the item is being viewed is part of the eBay Partner Network. Currently Singapore (EBAY_SG) is not supported.
+
+For additional information, refer to eBay Partner Network.
+The seller enables affiliate tracking for the item by including the X-EBAY-C-ENDUSERCTX request header in the method.
+Occurrence: Conditional
+
+
+itemSummaries.itemCreationDate	string	
+The date and time when the item listing was created. This value is returned in UTC format (yyyy-MM-ddThh:mm:ss.sssZ), which you can convert into the local time of the buyer.
+
+This field is always returned with itemSummaries.
+Occurrence: Conditional
+
+
+itemSummaries.itemEndDate	string	
+A timestamp that indicates the date and time a listing is scheduled to end.
+
+This value is returned in UTC format (yyyy-MM-ddThh:mm:ss.sssZ), which can be converted into the local time of the buyer.
+Occurrence: Conditional
+
+
+itemSummaries.itemGroupHref	string	
+The HATEOAS reference of the parent page of the item group. An item group is an item that has various aspect differences, such as color, size, storage capacity, etc.
+
+Note: This field is returned only for item groups.
+Occurrence: Conditional
+
+
+itemSummaries.itemGroupType	string	
+The indicates the item group type. An item group is an item that has various aspect differences, such as color, size, storage capacity, etc.
+
+Currently only the SELLER_DEFINED_VARIATIONS is supported and indicates this is an item group created by the seller.
+
+Note: This field is returned only for item groups.
+Occurrence: Conditional
+
+
+itemSummaries.itemHref	string	
+The URI for the Browse API getItem method, which can be used to retrieve more details about items in the search results.
+Occurrence: Conditional
+
+
+itemSummaries.itemId	string	
+The unique RESTful identifier of the item.
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation	ItemLocationImpl	
+This container returns the location of the item. This container consists of fields you typically see for an address, including postal code, county, state/province, street address, city, and country (2-digit ISO code).
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation.addressLine1	string	
+The first line of the street address.
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation.addressLine2	string	
+The second line of the street address. This field may contain such values as an apartment or suite number.
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation.city	string	
+The city in which the item is located.
+
+Restriction: This field is populated in the search method response only when fieldgroups = EXTENDED.
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation.country	CountryCodeEnum	
+The two-letter ISO 3166 standard code that indicates the country in which the item is located.
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation.county	string	
+The county in which the item is located.
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation.postalCode	string	
+The postal code (or zip code in US) where the item is located. Sellers set a postal code for items when they are listed. The postal code is used for calculating proximity searches. It is anonymized when returned in itemLocation.postalCode via the API.
+Occurrence: Conditional
+
+
+itemSummaries.itemLocation.stateOrProvince	string	
+The state or province in which the item is located.
+Occurrence: Conditional
+
+
+itemSummaries.itemOriginDate	string	
+The date and time when the listing was first made available. This date will be retained if an item is relisted. This value is returned in UTC format (yyyy-MM-ddThh:mm:ss.sssZ), which you can convert into the local time of the buyer.
+
+This timestamp is used to sort the response when the sort=newlyListed parameter is used.
+
+This field is always returned with itemSummaries.
+Occurrence: Conditional
+
+
+itemSummaries.itemWebUrl	string	
+The URL to the View Item page of the item. This enables you to include a "Report Item on eBay" hyperlink that takes the buyer to the View Item page on eBay. From there they can report any issues regarding this item to eBay.
+Occurrence: Conditional
+
+
+itemSummaries.leafCategoryIds	array of string	
+The leaf category IDs of the item. When the item belongs to two leaf categories, the ID values are returned in the order primary, secondary.
+Occurrence: Conditional
+
+
+itemSummaries.legacyItemId	string	
+The unique identifier of the eBay listing that contains the item. This is the traditional/legacy ID that is often seen in the URL of the listing View Item page.
+Occurrence: Conditional
+
+
+itemSummaries.listingMarketplaceId	MarketplaceIdEnum	
+The ID of the eBay marketplace on which the seller listed the item.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice	MarketingPrice	
+This container is returned if the item is eligible for a seller discount and contains the item's original price, and the seller discount amount and percentage.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.discountAmount	ConvertedAmount	
+This container returns the monetary amount of the seller discount.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.discountAmount.convertedFromCurrency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the convertedFromValue field. This value is required or returned only if currency conversion/localization is required, and represents the pre-conversion currency.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.discountAmount.convertedFromValue	string	
+The monetary amount before any conversion is performed, in the currency specified by the convertedFromCurrency field. This value is required or returned only if currency conversion/localization is required. The value field contains the converted amount of this value, in the currency specified by the currency field.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.discountAmount.currency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the value field. If currency conversion/localization is required, this is the post-conversion currency of the amount in the value field.
+
+Default: The currency of the authenticated user's country.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.discountAmount.value	string	
+The monetary amount in the currency specified by the currency field. If currency conversion/localization is required, this value is the converted amount, and the convertedFromValue field contains the amount in the original currency.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.discountPercentage	string	
+This field expresses the percentage of the seller discount based on the value in the originalPrice container.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.originalPrice	ConvertedAmount	
+This container returns the monetary amount of the item without the discount.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.originalPrice.convertedFromCurrency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the convertedFromValue field. This value is required or returned only if currency conversion/localization is required, and represents the pre-conversion currency.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.originalPrice.convertedFromValue	string	
+The monetary amount before any conversion is performed, in the currency specified by the convertedFromCurrency field. This value is required or returned only if currency conversion/localization is required. The value field contains the converted amount of this value, in the currency specified by the currency field.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.originalPrice.currency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the value field. If currency conversion/localization is required, this is the post-conversion currency of the amount in the value field.
+
+Default: The currency of the authenticated user's country.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.originalPrice.value	string	
+The monetary amount in the currency specified by the currency field. If currency conversion/localization is required, this value is the converted amount, and the convertedFromValue field contains the amount in the original currency.
+Occurrence: Conditional
+
+
+itemSummaries.marketingPrice.priceTreatment	PriceTreatmentEnum	
+Indicates the pricing treatment (discount) that was applied to the price of the item.
+
+Note: The pricing treatment affects the way and where the discounted price can be displayed.
+Occurrence: Conditional
+
+
+itemSummaries.pickupOptions	array of PickupOptionSummary	
+This container returns the local pickup options available to the buyer. This container is returned only if the user is searching for local pickup items and set the local pickup filters in the method request.
+Occurrence: Conditional
+
+
+itemSummaries.pickupOptions.pickupLocationType	string	
+This container returns the local pickup options available to the buyer. Possible values are ARRANGED_LOCATION and STORE.
+Occurrence: Conditional
+
+
+itemSummaries.price	ConvertedAmount	
+The price of the item after it has been converted into another currency.
+
+The price includes the value-added tax (VAT) for applicable jurisdictions when requested from supported marketplaces. In this case, users must do one or more of the following to view VAT-inclusive pricing:
+Pass the X-EBAY-C-MARKETPLACE-ID request header specifying the supported marketplace (such as EBAY_GB)
+Pass the contextualLocation values for the supported marketplace in the X-EBAY-C-ENDUSERCTX request header
+Specify the supported marketplace using the deliveryCountry filter URI parameter (such as filter=deliveryCountry:GB)
+Note: For more information on VAT, refer to Your VAT Obligations in the UK & EU.
+Occurrence: Conditional
+
+
+itemSummaries.price.convertedFromCurrency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the convertedFromValue field. This value is required or returned only if currency conversion/localization is required, and represents the pre-conversion currency.
+Occurrence: Conditional
+
+
+itemSummaries.price.convertedFromValue	string	
+The monetary amount before any conversion is performed, in the currency specified by the convertedFromCurrency field. This value is required or returned only if currency conversion/localization is required. The value field contains the converted amount of this value, in the currency specified by the currency field.
+Occurrence: Conditional
+
+
+itemSummaries.price.currency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the value field. If currency conversion/localization is required, this is the post-conversion currency of the amount in the value field.
+
+Default: The currency of the authenticated user's country.
+Occurrence: Conditional
+
+
+itemSummaries.price.value	string	
+The monetary amount in the currency specified by the currency field. If currency conversion/localization is required, this value is the converted amount, and the convertedFromValue field contains the amount in the original currency.
+Occurrence: Conditional
+
+
+itemSummaries.priceDisplayCondition	PriceDisplayConditionEnum	
+Indicates when in the buying flow the item's price can appear for minimum advertised price (MAP) items, which is the lowest price a retailer can advertise/show for this item.
+Occurrence: Conditional
+
+
+itemSummaries.priorityListing	boolean	
+This field is returned as true if the listing is part of a Promoted Listing campaign. Promoted Listings are available to Above Standard and Top Rated sellers with recent sales activity.
+
+Note: Priority Listing is returned only with a Best Match sort and will not be returned for other sort options.
+Occurrence: Conditional
+
+
+itemSummaries.qualifiedPrograms	array of string	
+An array of the qualified programs available for the item, such as EBAY_PLUS, AUTHENTICITY_GUARANTEE, and AUTHENTICITY_VERIFICATION.
+
+eBay Plus is a premium account option for buyers, which provides benefits such as fast, free domestic shipping and free returns on selected items. Top-Rated eBay sellers must opt in to eBay Plus to be able to offer the program on qualifying listings. Sellers must commit to next-day delivery of those items.
+
+Note: eBay Plus is only available as a listing feature on the eBay Australia marketplace.
+
+
+The eBay Authenticity Guarantee program enables third-party authenticators to perform authentication verification inspections on items such as watches and sneakers.
+Occurrence: Conditional
+
+
+itemSummaries.seller	Seller	
+This container returns basic information about the seller of the item, such as name, feedback score, etc.
+Occurrence: Conditional
+
+
+itemSummaries.seller.feedbackPercentage	string	
+The percentage of the total positive feedback.
+Occurrence: Conditional
+
+
+itemSummaries.seller.feedbackScore	integer	
+The feedback score of the seller. This value is based on the ratings from eBay members that bought items from this seller.
+Occurrence: Conditional
+
+
+itemSummaries.seller.sellerAccountType	string	
+Indicates if the seller is a business or an individual. This is determined when the seller registers with eBay:
+If they register for a business account, this value will be BUSINESS.
+If they register for a private account, this value will be INDIVIDUAL.
+This designation is required by the tax laws in some countries.
+
+This field is returned only on the following sites:
+
+EBAY_AT, EBAY_BE, EBAY_CH, EBAY_DE, EBAY_ES, EBAY_FR, EBAY_GB, EBAY_IE, EBAY_IT, EBAY_PL
+
+Valid Values: BUSINESS or INDIVIDUAL
+Occurrence: Conditional
+
+
+itemSummaries.seller.username	string	
+The user name created by the seller for use on eBay.
+
+Note: Effective September 26, 2025, select developers will no longer receive username data for U.S. users through this field. Instead, an immutable user ID will be returned in its place. For more information, please refer to Data Handling Compliance.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions	array of ShippingOptionSummary	
+This container returns the shipping options available to ship the item.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.guaranteedDelivery	boolean	
+Although this field is still returned, it can be ignored since eBay Guaranteed Delivery is no longer a supported feature on any marketplace. This field may get removed from the schema in the future.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.maxEstimatedDeliveryDate	string	
+The end date of the delivery window (latest projected delivery date). This value is returned in UTC format (yyyy-MM-ddThh:mm:ss.sssZ), which you can convert into the local time of the buyer.
+
+Note: For the best accuracy, always include the contextualLocation values in the X-EBAY-C-ENDUSERCTX request header.
+
+Note: Estimated delivery dates are not returned for CBT items.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.minEstimatedDeliveryDate	string	
+The start date of the delivery window (earliest projected delivery date). This value is returned in UTC format (yyyy-MM-ddThh:mm:ss.sssZ), which you can convert into the local time of the buyer.
+
+Note: For the best accuracy, always include the contextualLocation values in the X-EBAY-C-ENDUSERCTX request header.
+
+Note: Estimated delivery dates are not returned for CBT items.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.shippingCost	ConvertedAmount	
+This is the estimated price to ship the item.
+
+The price includes the value-added tax (VAT) for applicable jurisdictions when requested from supported marketplaces. In this case, users must do one or more of the following to see VAT-inclusive pricing:
+Pass the X-EBAY-C-MARKETPLACE-ID request header specifying the supported marketplace (such as EBAY_GB)
+Pass the contextualLocation values for the supported marketplace in the X-EBAY-C-ENDUSERCTX request header
+Specify the supported marketplace using the deliveryCountry filter URI parameter (such as filter=deliveryCountry:GB)
+Note:For more information on VAT, refer to Your VAT Obligations in the UK & EU.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.shippingCost.convertedFromCurrency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the convertedFromValue field. This value is required or returned only if currency conversion/localization is required, and represents the pre-conversion currency.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.shippingCost.convertedFromValue	string	
+The monetary amount before any conversion is performed, in the currency specified by the convertedFromCurrency field. This value is required or returned only if currency conversion/localization is required. The value field contains the converted amount of this value, in the currency specified by the currency field.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.shippingCost.currency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the value field. If currency conversion/localization is required, this is the post-conversion currency of the amount in the value field.
+
+Default: The currency of the authenticated user's country.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.shippingCost.value	string	
+The monetary amount in the currency specified by the currency field. If currency conversion/localization is required, this value is the converted amount, and the convertedFromValue field contains the amount in the original currency.
+Occurrence: Conditional
+
+
+itemSummaries.shippingOptions.shippingCostType	string	
+Indicates the type of shipping used to ship the item. Possible values are FIXED (flat-rate shipping) and CALCULATED (shipping cost calculated based on item and buyer location).
+Occurrence: Conditional
+
+
+itemSummaries.shortDescription	string	
+This text string is derived from the item condition and the item aspects (such as size, color, capacity, model, brand, etc.) Sometimes the title does not provide enough information but the description is too big. Surfacing the shortDescription can often provide buyers with the additional information that could help them make a buying decision.
+
+For example:
+"title": "Petrel U42W FPV Drone RC Quadcopter w/HD Camera Live Video One Key Off / Landing",
+"shortDescription": "1 U42W Quadcopter. Syma X5SW-V3 Wifi FPV RC Drone Quadcopter 2.4Ghz 6-Axis Gyro with Headless Mode. Syma X20 Pocket Drone 2.4Ghz Mini RC Quadcopter Headless Mode Altitude Hold. One Key Take Off / Landing function: allow beginner to easy to fly the drone without any skill.",
+
+Restriction: This field is returned by the search method only when fieldgroups = EXTENDED.
+Occurrence: Conditional
+
+
+itemSummaries.thumbnailImages	array of Image	
+An array of thumbnail images for the item.
+Occurrence: Conditional
+
+
+itemSummaries.thumbnailImages.height	integer	
+Reserved for future use.
+Occurrence: Conditional
+
+
+itemSummaries.thumbnailImages.imageUrl	string	
+The URL of the image.
+Occurrence: Conditional
+
+
+itemSummaries.thumbnailImages.width	integer	
+Reserved for future use.
+Occurrence: Conditional
+
+
+itemSummaries.title	string	
+The seller-created title of the item.
+
+Maximum Length: 80 characters
+Occurrence: Conditional
+
+
+itemSummaries.topRatedBuyingExperience	boolean	
+This indicates if the item is a top-rated plus item. There are three benefits of a top-rated plus item: a minimum 30-day money-back return policy; shipping the item in 1 business day with tracking provided; and the added comfort of knowing that this item is from an experienced seller with the highest buyer ratings. For more information, refer to Look for Top Rated Plus Items and Seller performance overview.
+Occurrence: Conditional
+
+
+itemSummaries.tyreLabelImageUrl	string	
+The URL to the image that shows the information on the tyre label.
+Occurrence: Conditional
+
+
+itemSummaries.unitPrice	ConvertedAmount	
+The price per unit for the item. Some European countries require listings for certain types of products to include the price per unit so buyers can accurately compare prices.
+
+For example:
+"unitPricingMeasure": "100g",
+ "unitPrice": {
+  "value": "7.99",
+  "currency": "GBP"
+Occurrence: Conditional
+
+
+itemSummaries.unitPrice.convertedFromCurrency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the convertedFromValue field. This value is required or returned only if currency conversion/localization is required, and represents the pre-conversion currency.
+Occurrence: Conditional
+
+
+itemSummaries.unitPrice.convertedFromValue	string	
+The monetary amount before any conversion is performed, in the currency specified by the convertedFromCurrency field. This value is required or returned only if currency conversion/localization is required. The value field contains the converted amount of this value, in the currency specified by the currency field.
+Occurrence: Conditional
+
+
+itemSummaries.unitPrice.currency	CurrencyCodeEnum	
+The three-letter ISO 4217 code representing the currency of the amount in the value field. If currency conversion/localization is required, this is the post-conversion currency of the amount in the value field.
+
+Default: The currency of the authenticated user's country.
+Occurrence: Conditional
+
+
+itemSummaries.unitPrice.value	string	
+The monetary amount in the currency specified by the currency field. If currency conversion/localization is required, this value is the converted amount, and the convertedFromValue field contains the amount in the original currency.
+Occurrence: Conditional
+
+
+itemSummaries.unitPricingMeasure	string	
+The designation, such as size, weight, volume, count, etc., that was used to specify the quantity of the item. This helps buyers compare prices.
+
+For example, the following tells the buyer that the item is 7.99 per 100 grams.
+"unitPricingMeasure": "100g",
+ "unitPrice": {
+  "value": "7.99",
+  "currency": "GBP"
+Occurrence: Conditional
+
+
+itemSummaries.watchCount	integer	
+The number of users that have added the item to their watch list.
+
+Note: This field is restricted to applications that have been granted permission to access this feature. You must submit an App Check ticket to request this access. In the App Check form, add a note to the Application Title/Summary and/or Application Details fields indicating that you want access to Watch Count data in the Browse API.
+Occurrence: Conditional
+
+
+limit	integer	
+The value of the limit parameter submitted in the request, which is the maximum number of items to return on a page, from the result set. A result set is the complete set of items returned by the method.
+Occurrence: Always
+
+
+next	string	
+The URI for the next page of results. This value is returned if there is an additional page of results to return from the result set.
+
+The following example of the search method returns items 5 thru 10 from the list of items found.
+https://api.ebay.com/buy/v1/item_summary/search?query=t-shirts&limit=5&offset=10
+Occurrence: Conditional
+
+
+offset	integer	
+This value indicates the offset used for current page of items being returned. Assume the initial request used an offset of 0 and a limit of 3. Then in the first page of results, this value would be 0, and items 1-3 are returned. For the second page, this value is 3 and so on.
+Occurrence: Always
+
+
+prev	string	
+The URI for the previous page of results. This is returned if there is a previous page of results from the result set.
+
+The following example of the search method returns items 1 thru 5 from the list of items found, which would be the first set of items returned.
+https://api.ebay.com/buy/v1/item_summary/search?query=t-shirts&limit=5&offset=0
+Occurrence: Conditional
+
+
+refinement	Refinement	
+The container for all the search refinements.
+Occurrence: Conditional
+
+
+refinement.aspectDistributions	array of AspectDistribution	
+An array of containers for the all the aspect refinements.
+Occurrence: Conditional
+
+
+refinement.aspectDistributions.aspectValueDistributions	array of AspectValueDistribution	
+An array of containers for the various values of the aspect and the match count, and a HATEOAS reference (refinementHref) for this aspect.
+Occurrence: Conditional
+
+
+refinement.aspectDistributions.aspectValueDistributions.localizedAspectValue	string	
+The value of an aspect. For example, Red is a value for the aspect Color.
+Occurrence: Always
+
+
+refinement.aspectDistributions.aspectValueDistributions.matchCount	integer	
+The number of items with this aspect.
+Occurrence: Always
+
+
+refinement.aspectDistributions.aspectValueDistributions.refinementHref	string	
+A HATEOAS reference for this aspect.
+Occurrence: Always
+
+
+refinement.aspectDistributions.localizedAspectName	string	
+The name of an aspect, such as Brand, Color, etc.
+Occurrence: Conditional
+
+
+refinement.buyingOptionDistributions	array of BuyingOptionDistribution	
+An array of containers for the all the buying option refinements.
+Occurrence: Conditional
+
+
+refinement.buyingOptionDistributions.buyingOption	string	
+The container that returns the buying option type. This will be AUCTION, FIXED_PRICE, CLASSIFIED_AD, or a combination of these options. For details, see buyingOptions.
+Occurrence: Always
+
+
+refinement.buyingOptionDistributions.matchCount	integer	
+The number of items having this buying option.
+Occurrence: Always
+
+
+refinement.buyingOptionDistributions.refinementHref	string	
+The HATEOAS reference for this buying option.
+Occurrence: Always
+
+
+refinement.categoryDistributions	array of CategoryDistribution	
+An array of containers for the all the category refinements.
+Occurrence: Conditional
+
+
+refinement.categoryDistributions.categoryId	string	
+The unique identifier of the category.
+Occurrence: Always
+
+
+refinement.categoryDistributions.categoryName	string	
+The name of the category, such as Baby & Toddler Clothing.
+Occurrence: Always
+
+
+refinement.categoryDistributions.matchCount	integer	
+The number of items in this category.
+Occurrence: Always
+
+
+refinement.categoryDistributions.refinementHref	string	
+The HATEOAS reference of this category.
+Occurrence: Always
+
+
+refinement.conditionDistributions	array of ConditionDistribution	
+An array of containers for the all the condition refinements.
+Occurrence: Conditional
+
+
+refinement.conditionDistributions.condition	string	
+The text describing the condition of the item, such as New or Used. For a list of condition names, refer to Item Condition IDs and Names.
+Occurrence: Conditional
+
+
+refinement.conditionDistributions.conditionId	string	
+The identifier of the condition. For example, 1000 is the identifier for NEW.
+Occurrence: Conditional
+
+
+refinement.conditionDistributions.matchCount	integer	
+The number of items having the condition.
+Occurrence: Always
+
+
+refinement.conditionDistributions.refinementHref	string	
+The HATEOAS reference of this condition.
+Occurrence: Always
+
+
+refinement.dominantCategoryId	string	
+The identifier of the category that most of the items are part of.
+Occurrence: Always
+
+
+total	integer	
+The total number of items that match the input criteria.
+
+Note: total is just an indicator of the number of listings for a given query. It could vary based on the number of listings with variations included in the result. It is strongly recommended that total not be used in pagination use cases. Instead, use next to determine the results on the next page.
+Occurrence: Always
+
+
+warnings	array of ErrorDetailV3	
+The container with all the warnings for the request.
+Occurrence: Conditional
+
+
+warnings.category	string	
+This string value indicates the error category. There are three categories of errors: request errors, application errors, and system errors.
+Occurrence: Always
+
+
+warnings.domain	string	
+The name of the primary system where the error occurred. This is relevant for application errors.
+Occurrence: Always
+
+
+warnings.errorId	integer	
+A unique code that identifies the particular error or warning that occurred. Your application can use error codes as identifiers in your customized error-handling algorithms.
+Occurrence: Always
+
+
+warnings.inputRefIds	array of string	
+An array of reference IDs that identify the specific request elements most closely associated to the error or warning, if any.
+Occurrence: Conditional
+
+
+warnings.longMessage	string	
+A detailed description of the condition that caused the error or warning, and information on what to do to correct the problem.
+Occurrence: Conditional
+
+
+warnings.message	string	
+A description of the condition that caused the error or warning.
+Occurrence: Always
+
+
+warnings.outputRefIds	array of string	
+An array of reference IDs that identify the specific response elements most closely associated to the error or warning, if any.
+Occurrence: Conditional
+
+
+warnings.parameters	array of ErrorParameterV3	
+An array of warning and error messages that return one or more variables contextual information about the error or warning. This is often the field or value that triggered the error or warning.
+Occurrence: Conditional
+
+
+warnings.parameters.name	string	
+This is the name of input field that caused an issue with the call request.
+Occurrence: Conditional
+
+
+warnings.parameters.value	string	
+This is the actual value that was passed in for the element specified in the name field.
+Occurrence: Conditional
+
+
+warnings.subdomain	string	
+The name of the subdomain in which the error or warning occurred.
+Occurrence: NA
+
+
+HTTP status codes
+This call can return one of the following HTTP status codes. For an overview of the status codes, see HTTP status codes in Using eBay RESTful APIs.
+
+Status	Meaning
+200	OK
+400	Bad Request
+500	Internal Server Error
+Error codes
+For more on errors, plus the codes of other common errors, see Handling errors.
+
+Code	Domain	Category	Meaning
+12000	API_BROWSE	APPLICATION	There was a problem with an eBay internal system or process. Contact eBay developer support for assistance.
+12001	API_BROWSE	REQUEST	The call must have a valid 'q', 'category_ids', 'epid' or 'gtin' query parameter.
+12004	API_BROWSE	REQUEST	The 'offset' value cannot be negative.
+12005	API_BROWSE	REQUEST	The 'offset' value must be an integer.
+12006	API_BROWSE	REQUEST	The 'limit' value should be between 1 and 200 (inclusive).
+12007	API_BROWSE	REQUEST	The 'limit' value must be an integer value.
+12013	API_BROWSE	BUSINESS	Top level category browsing is not allowed. Please provide keywords or more filters for the applied top level category.
+12019	API_BROWSE	BUSINESS	Currently, the {marketplaceId} marketplace is not supported. The supported Marketplaces are: {allowedMarketplaces} .
+12020	API_BROWSE	BUSINESS	The 'fieldgroups' value {fieldgroups} is invalid when multiple 'category_ids' are specified. Either change the call to have only one value in 'category_ids' or remove the 'fieldgroups'.
+12023	API_BROWSE	REQUEST	This keyword search results in a response that is too large to return. Either change the keyword or add additional query parameters and/or filters.
+12025	API_BROWSE	REQUEST	The 'charity_ids' field has exceeded the maximum limit of 20.
+12026	API_BROWSE	REQUEST	The 'charity_ids' field is not supported for the marketplace {marketplaceId}. Valid marketplaces are: {validMarketplaces}.
+12027	API_BROWSE	REQUEST	The 'auto_correct' value is invalid. For the valid values, refer to the API call documentation.
+12028	API_BROWSE	REQUEST	The 'auto_correct' is not supported for the marketplace {marketplaceId}. Valid marketplaces are: {validMarketplaces}
+12029	API_BROWSE	REQUEST	The maximum number of listings that can be retrieved is 10,000, so your offset value must be less than 10,000. If 10,000 or more listings are matching your search criteria, consider narrowing the scope of your search.
+12030	API_BROWSE	REQUEST	The number of categories in the request has exceeded the limit. Please reduce the number of categories to {allowedMaxCategories} or less.
+12032	API_BROWSE	REQUEST	The number of sellers in the filter has exceeded the limit. Please reduce the number of sellers to 250 or fewer.
+12033	API_BROWSE	REQUEST	The 'qualifiedPrograms' filter for {filterValue} requires valid 'deliveryPostalCode' and 'deliveryCountry' filter values.
+12034	API_BROWSE	REQUEST	The 'buyingOptions' filter value {filterValue} is not supported for the sort by {sortOption}. For the supported values, refer to the API call documentation.
+12503	API_BROWSE	REQUEST	There is no compatibility information found either because there is no compatibility results or the data provided in the compatibility_filter is invalid or insufficient.
+12504	API_BROWSE	REQUEST	You must provide a category ID that supports fitment.
+12505	API_BROWSE	REQUEST	The following compatibility attributes in the request are not supported: {attributes}.
+12506	API_BROWSE	REQUEST	The category ID submitted does not support fitment.
+12507	API_BROWSE	REQUEST	To filter by 'guaranteedDeliveryInDays', you must include 'deliveryCountry'.
+12508	API_BROWSE	REQUEST	To filter by 'guaranteedDeliveryInDays', you must include 'deliveryPostalCode' for the 'deliveryCountry'.
+12509	API_BROWSE	REQUEST	The 'guaranteedDeliveryInDays' value {guaranteedDeliveryInDays} is invalid for 'deliveryCountry' value {deliveryCountry}. Valid values for 'guaranteedDeliveryInDays' for {deliveryCountry} must be in the range of {rangeLowerBound} to {rangeUpperBound} inclusive.
+12510	API_BROWSE	REQUEST	The 'guaranteedDeliveryInDays' filter is not supported for the marketplace {marketplaceId}. Valid marketplaces are: {validMarketplaces}
+12512	API_BROWSE	REQUEST	The 'qualifiedPrograms' filter for {filterValue} is not supported for the marketplace {marketplaceId}. Valid marketplaces are: {validMarketplaces}
+12513	API_BROWSE	BUSINESS	The 'priorityListing' filter for {filterValue} is not supported for the marketplace {marketplaceId}. Valid marketplaces are: {validMarketplaces}
+12514	API_BROWSE	BUSINESS	The 'priorityListing' filter is not supported for the specified sort option. Refer to the API call documentation.
+12515	API_BROWSE	REQUEST	The 'offset' value must be either zero or a multiple of the 'limit' value.
+12516	API_BROWSE	REQUEST	The ‘q’ value is invalid. It must be longer than one character when using the ‘searchInDescription’ filter.
+12517	API_BROWSE	REQUEST	Only one item location filter can be applied at a time. Refer to the API call documentation.
+12518	API_BROWSE	REQUEST	The 'itemLocationRegion' filter value is not supported for the marketplace {marketplaceId}. Valid values are: {validRegionValues}
+Warnings
+For more on warnings, plus the codes of other common warnings, see Handling errors.
+
+Code	Domain	Category	Meaning
+12002	API_BROWSE	REQUEST	The {filterName} value is invalid. For the valid values, refer to the API call documentation.
+12003	API_BROWSE	REQUEST	A seller 'username' provided in the request filters is invalid.
+12008	API_BROWSE	REQUEST	The 'sort' value is invalid. For the valid values, refer to the API call documentation.
+12009	API_BROWSE	REQUEST	The 'category_ids' query parameter is invalid.
+12010	API_BROWSE	REQUEST	There are four filters required for local pickup. 'pickupPostalCode','pickupCountry','pickupRadiusUnit','pickupRadius'. One or more is missing or invalid.
+12011	API_BROWSE	REQUEST	'deliveryCountry' is a mandatory filter to provide a delivery location. 'deliveryPostalCode' is optional.
+12012	API_BROWSE	REQUEST	A valid 'price' filter and a valid 'priceCurrency' filter is necessary to filter based on price.
+12014	API_BROWSE	BUSINESS	The 'sellerAccountTypes' filter is not supported for the marketplace {marketplaceId}. Valid marketplaces are: {validMarketplaces}
+12015	API_BROWSE	REQUEST	The postal code filter value is invalid for the specified country and this filter was ignored.
+12016	API_BROWSE	REQUEST	The 'fieldgroups' value {fieldgroups} is invalid. For the valid values, refer to the API call reference documentation
+12017	API_BROWSE	REQUEST	The 'aspect_filter' query parameter must include a categoryId. For information, see the API call reference documentation.
+12018	API_BROWSE	REQUEST	The {aspectFilter} aspect_filter value is invalid. For information, see the API call reference documentation.
+12021	API_BROWSE	REQUEST	The 'epid' value {epid} is invalid. For information, see the API call reference documentation.
+12022	API_BROWSE	REQUEST	The 'gtin' value {gtin} is invalid. For information, see the API call reference documentation.
+12024	API_BROWSE	REQUEST	The 'charity_ids' value {charity_id} is invalid. For more information see the API call reference documentation.
+12502	API_BROWSE	REQUEST	The {compatibilityFilter} compatibility_filter is invalid. For information, see the API call reference documentation.
+12511	API_BROWSE	REQUEST	Either 'deliveryCountry' or 'deliveryPostalCode' is invalid, hence 'guaranteedDeliveryInDays' filter was ignored.
+12519	API_BROWSE	REQUEST	The '{fieldName}' value '{filterValue}' is not supported with 'deliveryCountry' '{deliveryCountry}' on marketplace '{marketplaceId}'. The region filter will be ignored and results will follow the site's default location behavior.
+Samples
+New to making API calls? Please see Making a Call.
+
+Note: Identifiers, such as order IDs or user IDs, and personal data in these samples might be anonymized or may no longer be active on eBay. If necessary, substitute current, relevant eBay data in your requests.
+
+Sample 1: Search for Items by Keyword
+Sample 2: Search for Items by Category
+Sample 3: Refine Keyword Results by Category
+Sample 4: Retrieve the Item Aspects by Keyword Search
+Sample 5: Return All Refinements For a Category
+Sample 6: Filter the Keyword Results by Item Aspects
+Sample 7: Return Items with Free Shipping
+Sample 8: Return Items Based on Price and Condition
+Sample 9: Return Items Associated with a Charity
+Sample 10: Return Items that are Compatible with the Keyword and Vehicle
+Sample 11: Return Items Based on Auto-Corrected Keyword
+Sample 1: Search for Items by Keyword
+This sample returns a set of eBay items that match the keyword.
+
+Input
+The inputs are limit and q, which is the keyword, URI parameters. There is no payload with this request.
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=drone&limit=3
+
+Output
+If the call is successful, 3 items per set will be returned.
+
+  
+Sample 2: Search for Items by Category
+This sample searches for items in the Soccer Balls category.
+
+Input
+The inputs are category_ids, limit, and offset URI parameters. There is no payload with this request.
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?category_ids=20863&limit=3&offset=9
+
+Output
+If the call is successful, soccer balls are returned. Since limit=3 and offset=9 were specified, and the offset specified is a multiple of the limit, the fourth page containing items 10 through 12 (of the total 16987 items) was returned.
+
+  
+Sample 3: Refine Keyword Results by Category
+Using a category ID with a keyword gives you additional control over the result set. For example, let's say you are looking of a toy phone. If you search for "phone", the result set will be mobile phones because this is the "Best Match" for this search. But if you also include the toy category ID, the results will be what you wanted.
+
+Input
+The inputs are q and categoryIds URI parameters. There is no payload with this request.
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=phone&category_ids=220&limit=3
+
+Output
+If the call is successful, toy phones are returned.
+
+  
+Sample 4: Retrieve the Item Aspects by Keyword Search
+This call searches for drones. Based on the results of that search, it returns the dominant category ID, which is the category most of the items are in and the aspect refinements for this category.
+
+Input
+The inputs are q and fieldgroups=ASPECT_REFINEMENTS URI parameters. There is no payload with this request.
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=drone&fieldgroups=ASPECT_REFINEMENTS
+
+Output
+If the call is successful, the dominantCategoryId field, which we will use in the next sample, and the aspectDistributions container are returned.
+
+  
+Sample 5: Return All Refinements For a Category
+This call retrieves all the refinements for the category submitted. We used the category ID returned by the previous sample in the dominantCategoryId field.
+If you wanted to return the refinement and the items, you would replace fieldgroups=ASPECT_REFINEMENTS,CATEGORY_REFINEMENTS,CONDITION_REFINEMENTS,BUYING_OPTION_REFINEMENTS fieldgroups=FULL.
+
+
+Input
+The inputs are q and fieldgroups URI parameters. There is no payload with this request.
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=drone&limit=3&category_ids=179697&fieldgroups=ASPECT_REFINEMENTS,CATEGORY_REFINEMENTS,CONDITION_REFINEMENTS,BUYING_OPTION_REFINEMENTS
+
+Output
+If the call is successful, the dominantCategoryId field is return, which is the category that was submitted in the call. The categoryDistributions container is return, which shows the category name. The conditionDistributions buyingOptionDistributions aspectDistributions containers are returned, which contain all the refinements for the category. You can use response from this call to create a histogram for this category, which gives your shoppers the ability to browse the items and further refine the results.
+
+  
+Sample 6: Filter the Keyword Results by Item Aspects
+This call searches for drones and returns only the items within the category and the item aspects specified. Because fieldgroups is set to EXTENDED it also returns the shortDescription and itemLocation.city fields.
+
+Input
+The inputs are q, category_ids, fieldgroups and aspect_filter URI parameters. There is no payload with this request.
+Note: As with all query parameter values, the filter parameters must be URL encoded. But for readability in the request below, the encoding has been omitted. For more information about encoding request parameters, see URL encoding query parameter values.
+
+The first line of the response is the encoded request.
+
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=drone&category_ids=179697&limit=3&fieldgroups=EXTENDED,MATCHING_ITEMS&aspect_filter=categoryId:179697,conditionDistributions:{NEW},Connectivity:{App Controller},Camera Integration:{Camera Included},Type:{Ready to Fly Drone}
+
+Output
+If the call is successful, a paged collection of items matching the criteria are returned.
+
+  
+Sample 7: Return Items with Free Shipping
+This call searches for drones and returns only the items that offer free shipping.
+
+Input
+The inputs are q and filter=maxDeliveryCost URI parameters. There is no payload with this request.
+Note: As with all query parameter values, the filter parameters must be URL encoded. But for readability in the request below, the encoding has been omitted. For more information about encoding request parameters, see URL encoding query parameter values.
+
+The first line of the response is the encoded request.
+
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=drone&limit=3&filter=maxDeliveryCost:0
+
+Output
+If the call is successful, three items that have free shipping (shippingOptions.shippingCost.value is 0) are returned.
+
+  
+Sample 8: Return Items Based on Price and Condition
+This call searches for new iPhones within a price range.
+
+Input
+The inputs are q and the price, priceCurrency, and conditions, filter URI parameters. There is no payload with this request.
+Note: As with all query parameter values, the filter parameters must be URL encoded. But for readability in the request below, the encoding has been omitted. For more information about encoding request parameters, see URL encoding query parameter values.
+
+The first line of the response is the encoded request.
+
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=drone&limit=5&filter=price:[300..800],priceCurrency:USD,conditions:{NEW}
+
+Output
+If the call is successful, the items meeting the criteria are returned.
+
+  
+Sample 9: Return Items Associated with a Charity
+This call searches for items that are associated with the Toys for Tots charity.
+
+Input
+The inputs are q, charity_ids and limit.
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?charity_ids=203021444&limit=2
+
+Output
+If the call is successful, the items meeting the criteria are returned.
+
+  
+Sample 10: Return Items that are Compatible with the Keyword and Vehicle
+This call searches for brakes that are compatible with a 2018 BMW 318i.
+
+Input
+The inputs are q, category_ids, compatibility_filter, and limit. In order to get the best results, all the product attributes for the vehicle are specified; Make, Model, Year, Trim, and Engine.
+Note: As with all query parameter values, the filter parameters must be URL encoded. But for readability in the request below, the encoding has been omitted. For more information about encoding request parameters, see URL encoding query parameter values.
+
+The first line of the response is the encoded request.
+
+
+https://api.ebay.com/buy/browse/v1/item_summary/search?q=brakes&category_ids=33559&compatibility_filter=Year:2018;Make:BMW;Model:318i;Trim:Executive Sedan 4-Door;Engine:1.5L 1499CC l3 GAS DOHC Turbocharged&limit=3
+
+Output
+If the call is successful, the items meeting the criteria are returned. The attributes that are compatible are returned in the compatibilityProperties container and the compatibilityMatch field tells you how well the item matches this vehicle.
+In this example, all the items returned are an "exact" match.

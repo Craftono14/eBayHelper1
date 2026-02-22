@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { SavedSearches } from './pages/SavedSearches';
+import { SearchResults } from './pages/SearchResults';
 import { Feed } from './pages/Feed';
 import { Wishlist } from './pages/Wishlist';
 import { Login } from './pages/Login';
@@ -20,6 +21,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/saved-searches" element={<SavedSearches />} />
+            <Route path="/search/:searchId" element={<SearchResults />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/login" element={<Login />} />

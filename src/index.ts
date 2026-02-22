@@ -9,6 +9,7 @@ import oauthRoutes from './routes/oauth';
 import searchRoutes from './routes/search.routes';
 import authRoutes from './routes/auth.routes';
 import { createSearchesRouter } from './routes/searches.routes';
+import browseRoutes from './routes/browse.routes';
 import ebayLinkRoutes from './routes/ebay-link.routes';
 import ebayWatchlistRoutes from './routes/ebay-watchlist.routes';
 import ebaySyncRoutes from './routes/ebay-sync.routes';
@@ -123,6 +124,9 @@ app.use('/api/search', searchRoutes);
 
 // Searches dashboard routes
 app.use('/api/searches', createSearchesRouter());
+
+// Browse API routes (item search)
+app.use('/api/browse', browseRoutes);
 
 // Auth routes
 app.use('/api/auth', authRoutes);
