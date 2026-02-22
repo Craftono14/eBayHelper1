@@ -139,6 +139,9 @@ export class EbaySyncService {
         let syncedCount = 0;
         for (const ebaySearch of savedSearches) {
           try {
+            const categoriesJson = ebaySearch.categoryId ? JSON.stringify([ebaySearch.categoryId]) : null;
+            console.log(`[EbaySyncService] Saving search "${ebaySearch.searchName}" - CategoryID: ${ebaySearch.categoryId || 'null'}, Categories JSON: ${categoriesJson || 'null'}`);
+            
             await prisma.savedSearch.upsert({
               where: {
                 ebaySearchId: ebaySearch.searchName, // Use SearchName as unique identifier
@@ -154,7 +157,7 @@ export class EbaySyncService {
                 sortOrder: ebaySearch.sortOrder,
                 condition: ebaySearch.condition,
                 buyingFormat: ebaySearch.itemType,
-                categories: ebaySearch.categoryId ? JSON.stringify([ebaySearch.categoryId]) : null,
+                categories: categoriesJson,
                 itemLocation: ebaySearch.itemsLocatedIn,
                 zipCode: ebaySearch.postalCode,
                 isEbayImported: true,
@@ -172,7 +175,7 @@ export class EbaySyncService {
                 sortOrder: ebaySearch.sortOrder,
                 condition: ebaySearch.condition,
                 buyingFormat: ebaySearch.itemType,
-                categories: ebaySearch.categoryId ? JSON.stringify([ebaySearch.categoryId]) : null,
+                categories: categoriesJson,
                 itemLocation: ebaySearch.itemsLocatedIn,
                 zipCode: ebaySearch.postalCode,
                 isEbayImported: true,
@@ -743,7 +746,7 @@ export class EbaySyncService {
         const postalCode = this.extractXmlValue(searchXml, 'PostalCode');
 
         if (searchName) {
-          console.log(`[EbaySyncService] Search "${searchName}" - ItemSort: ${itemSort}, SortOrder: ${sortOrder}`);
+          console.log(`[EbaySyncService] Search "${searchName}" - ItemSort: ${itemSort}, SortOrder: ${sortOrder}, CategoryID: ${categoryId || 'null'}`);
           searches.push({
             searchName,
             queryKeywords,
