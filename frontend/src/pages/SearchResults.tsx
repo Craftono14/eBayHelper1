@@ -48,18 +48,40 @@ export const SearchResults: React.FC = () => {
 
   // Map eBay SavedSearch sortBy values to Browse API sort format
   const mapSortToBrowseAPI = (savedSearchSort: string | null): string => {
-    if (!savedSearchSort) return ''; // Use default (Best Match)
+    if (!savedSearchSort) {
+      console.log('[SearchResults] No sort preference specified, using default (Best Match)');
+      return '';
+    }
     
+    // eBay Trading API ItemSort values to Browse API sort format mapping
+    // Reference: https://developer.ebay.com/docs/trading/handle-search-requests
     const sortMap: Record<string, string> = {
-      'EndTime': 'endingSoonest',
-      'EndTimeSoonest': 'endingSoonest',
-      'NewlyListed': 'newlyListed',
-      'PriceLowest': 'price',
-      'PriceHighest': '-price',
-      'BestMatch': '', // Empty string = use default
+      // Date-based sorting
+      'EndTime': 'endingSoonest',          // Items ending soon first
+      'EndTimeSoonest': 'endingSoonest',   // Alias
+      'NewlyListed': 'newlyListed',        // Newly listed items first
+      'RecentlyListed': 'newlyListed',     // Alias
+      
+      // Price-based sorting
+      'CurrentPriceLowest': 'price',       // Lowest price first
+      'PriceLowest': 'price',              // Lowest price first
+      'CurrentPriceHighest': '-price',     // Highest price first
+      'PriceHighest': '-price',            // Highest price first
+      
+      // Default/best match
+      'BestMatch': '',                     // Empty string = use default/best match
+      '': '',                              // Empty = default
     };
     
-    return sortMap[savedSearchSort] || '';
+    const mappedSort = sortMap[savedSearchSort];
+    if (mappedSort !== undefined) {
+      console.log('[SearchResults] Mapped sort:', { ebaySort: savedSearchSort, browseAPISort: mappedSort || 'default (Best Match)' });
+      return mappedSort;
+    }
+    
+    // If not found in map, log warning and return empty (default to Best Match)
+    console.warn('[SearchResults] Unknown eBay sort value:', savedSearchSort, '- defaulting to Best Match');
+    return '';
   };
 
   // Fetch search details first
@@ -77,13 +99,19 @@ export const SearchResults: React.FC = () => {
         if (!response.ok) throw new Error('Failed to fetch search details');
 
         const search = await response.json();
+        console.log('[SearchResults] Full search object:', search);
+        
         setSearchName(search.name);
         setSearchQuery(search.searchKeywords);
         
         // Map the sort preference to Browse API format
         const sortValue = mapSortToBrowseAPI(search.sortBy);
         setSortParam(sortValue);
-        console.log('[SearchResults] Sort preference:', { savedSort: search.sortBy, browseSort: sortValue });
+        console.log('[SearchResults] Sort mapping:', { 
+          rawSortBy: search.sortBy,
+          mappedBrowseSort: sortValue,
+          rawSortOrder: search.sortOrder 
+        });
       } catch (err) {
         console.error('Failed to fetch search details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load search');

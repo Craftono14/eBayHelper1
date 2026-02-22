@@ -743,6 +743,7 @@ export class EbaySyncService {
         const postalCode = this.extractXmlValue(searchXml, 'PostalCode');
 
         if (searchName) {
+          console.log(`[EbaySyncService] Search "${searchName}" - ItemSort: ${itemSort}, SortOrder: ${sortOrder}`);
           searches.push({
             searchName,
             queryKeywords,
