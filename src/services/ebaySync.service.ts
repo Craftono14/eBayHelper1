@@ -575,13 +575,28 @@ export class EbaySyncService {
         const itemId = this.extractXmlValue(itemXml, 'ItemID');
         const title = this.extractXmlValue(itemXml, 'Title');
         const itemWebUrl = this.extractXmlValue(itemXml, 'ListingDetails', 'ViewItemURL');
-        const imageUrl =
-          this.extractXmlValue(itemXml, 'PictureDetails', 'GalleryURL') ||
-          this.extractXmlValue(itemXml, 'PictureDetails', 'PictureURL');
+        
+        // Debug PictureDetails extraction
+        const pictureDetailsRegex = /<PictureDetails>([\s\S]*?)<\/PictureDetails>/i;
+        const pictureDetailsMatch = itemXml.match(pictureDetailsRegex);
+        if (pictureDetailsMatch && itemId) {
+          console.log(`[EbaySyncService] PictureDetails for ${itemId}:`, pictureDetailsMatch[1].substring(0, 300));
+        }
+        
+        const galleryURL = this.extractXmlValue(itemXml, 'PictureDetails', 'GalleryURL');
+        const pictureURL = this.extractXmlValue(itemXml, 'PictureDetails', 'PictureURL');
+        const imageUrl = galleryURL || pictureURL;
+        
+        if (itemId) {
+          console.log(`[EbaySyncService] Item ${itemId} - GalleryURL: ${galleryURL}, PictureURL: ${pictureURL}, Final: ${imageUrl}`);
+        }
         
         // Debug image extraction
         if (!imageUrl && itemId) {
           console.log(`[EbaySyncService] No image found for item ${itemId}: ${title?.substring(0, 50)}`);
+          if (!pictureDetailsMatch) {
+            console.log(`[EbaySyncService] No PictureDetails section found for item ${itemId}`);
+          }
         }
         
         const priceValue = this.extractXmlValue(itemXml, 'SellingStatus', 'CurrentPrice');
