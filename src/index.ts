@@ -10,6 +10,7 @@ import searchRoutes from './routes/search.routes';
 import authRoutes from './routes/auth.routes';
 import { createSearchesRouter } from './routes/searches.routes';
 import browseRoutes from './routes/browse.routes';
+import feedRoutes from './routes/feed.routes';
 import ebayLinkRoutes from './routes/ebay-link.routes';
 import ebayWatchlistRoutes from './routes/ebay-watchlist.routes';
 import ebaySyncRoutes from './routes/ebay-sync.routes';
@@ -139,6 +140,9 @@ app.use('/api/searches', createSearchesRouter());
 
 // Browse API routes (item search)
 app.use('/api/browse', browseRoutes);
+
+// Feed routes (combined search results)
+app.use('/api/feed', feedRoutes);
 
 // Auth routes
 app.use('/api/auth', authRoutes);
