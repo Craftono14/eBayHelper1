@@ -28,6 +28,7 @@ interface ItemSummary {
     };
   }>;
   itemWebUrl?: string;
+  itemOriginDate?: string; // Listing date for sorting
 }
 
 // Get eBay OAuth app token (client credentials flow)
@@ -142,6 +143,7 @@ async function fetchSearchItems(
       buyingOptions: item.buyingOptions || [],
       shippingOptions: item.shippingOptions,
       itemWebUrl: item.itemWebUrl,
+      itemOriginDate: item.itemOriginDate, // Include listing date for sorting
     }));
   } catch (error: any) {
     console.error(`[feed] Error fetching items for "${searchKeywords}":`, error.response?.data || error.message);
@@ -221,7 +223,14 @@ router.post('/refresh', requireAuth, async (req: Request, res: Response): Promis
       }
     }
 
-    console.log(`[feed] Feed refresh complete: ${allItems.length} total unique items from ${searches.length} searches`);
+    // Re-sort all combined items by itemOriginDate (newest first)
+    allItems.sort((a, b) => {
+      const dateA = a.itemOriginDate ? new Date(a.itemOriginDate).getTime() : 0;
+      const dateB = b.itemOriginDate ? new Date(b.itemOriginDate).getTime() : 0;
+      return dateB - dateA; // Descending order (newest first)
+    });
+
+    console.log(`[feed] Feed refresh complete: ${allItems.length} total unique items from ${searches.length} searches, re-sorted by newest first`);
 
     res.json({
       items: allItems,

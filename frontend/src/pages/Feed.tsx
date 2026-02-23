@@ -19,6 +19,7 @@ interface ItemSummary {
     };
   }>;
   itemWebUrl?: string;
+  itemOriginDate?: string;
 }
 
 interface SavedSearch {
@@ -99,10 +100,11 @@ export const Feed: React.FC = () => {
         totalItems: data.items.length,
         searchCount: data.searchCount,
         itemsPerSearch: data.itemsPerSearch,
+        firstItemDate: data.items[0]?.itemOriginDate,
+        lastItemDate: data.items[data.items.length - 1]?.itemOriginDate,
       });
 
-      // Sort items by newly listed (most recent first)
-      // Items from eBay API come with itemId, so we'll preserve that ordering
+      // Items are already sorted by newest first from backend
       setItems(data.items);
       setLastRefreshTime(new Date().toLocaleString());
     } catch (err) {
