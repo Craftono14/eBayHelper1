@@ -1644,4 +1644,4 @@ https://api.ebay.com/buy/browse/v1/item_summary/search?q=brakes&category_ids=335
 
 Output
 If the call is successful, the items meeting the criteria are returned. The attributes that are compatible are returned in the compatibilityProperties container and the compatibilityMatch field tells you how well the item matches this vehicle.
-In this example, all the items returned are an "exact" match.
+In this example (searchSample.json), all the items returned are an "exact" match.
