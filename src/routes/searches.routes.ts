@@ -24,6 +24,7 @@ router.get('/dashboard', requireAuth, async (req: Request, res: Response): Promi
       searchKeywords: search.searchKeywords,
       newResultsCount: 0, // TODO: Implement proper new results tracking
       isEbayImported: search.isEbayImported,
+      includeInFeed: search.includeInFeed,
       createdAt: search.createdAt,
       updatedAt: search.updatedAt,
     }));
@@ -31,6 +32,37 @@ router.get('/dashboard', requireAuth, async (req: Request, res: Response): Promi
     res.json({ searches: searchesWithCounts });
   } catch (error) {
     console.error('[searches] dashboard error', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/searches/:id/feed - Toggle whether a search is included in feed
+router.patch('/:id/feed', requireAuth, async (req: Request, res: Response): Promise<any> => {
+  try {
+    const userId = (req as any).user?.id;
+    const searchId = parseInt(req.params.id);
+    const { includeInFeed } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (typeof includeInFeed !== 'boolean') {
+      return res.status(400).json({ error: 'includeInFeed must be a boolean' });
+    }
+
+    const updated = await (prisma.savedSearch as any).updateMany({
+      where: { id: searchId, userId },
+      data: { includeInFeed },
+    });
+
+    if (!updated || updated.count === 0) {
+      return res.status(404).json({ error: 'Search not found' });
+    }
+
+    res.json({ id: searchId, includeInFeed });
+  } catch (error) {
+    console.error('[searches] update includeInFeed error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -67,6 +99,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<any
       itemLocation: search.itemLocation,
       currency: search.currency,
       freeShipping: search.freeShipping,
+      includeInFeed: search.includeInFeed,
     });
   } catch (error) {
     console.error('[searches] get by id error', error);

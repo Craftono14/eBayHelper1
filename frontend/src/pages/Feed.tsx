@@ -26,6 +26,7 @@ interface SavedSearch {
   id: number;
   name: string;
   searchKeywords: string;
+  includeInFeed: boolean;
 }
 
 interface FeedResponse {
@@ -70,8 +71,10 @@ export const Feed: React.FC = () => {
 
   // Fetch combined feed from all searches
   const handleRefresh = async () => {
-    if (!isLoggedIn || searches.length === 0) {
-      setError('No saved searches to refresh');
+    const selectedSearches = searches.filter((search) => search.includeInFeed);
+
+    if (!isLoggedIn || selectedSearches.length === 0) {
+      setError('No saved searches selected for feed');
       return;
     }
 
@@ -86,7 +89,7 @@ export const Feed: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          searchIds: searches.map(s => s.id),
+          searchIds: selectedSearches.map(s => s.id),
         }),
       });
 
@@ -147,12 +150,12 @@ export const Feed: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold mb-2">Feed</h1>
             <p className="text-gray-600">
-              Combined results from all your {searches.length} saved searches, sorted by newest first
+              Combined results from your selected saved searches, sorted by newest first
             </p>
           </div>
           <button
             onClick={handleRefresh}
-            disabled={loading || searches.length === 0}
+            disabled={loading || searches.length === 0 || searches.every((search) => !search.includeInFeed)}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-semibold"
           >
             {loading ? 'Refreshing...' : 'Refresh Feed'}
@@ -178,7 +181,9 @@ export const Feed: React.FC = () => {
           <p className="text-gray-600">
             {searches.length === 0
               ? 'Create some saved searches first to populate your feed.'
-              : 'Click "Refresh Feed" to fetch the latest items from all your searches.'}
+              : searches.every((search) => !search.includeInFeed)
+                ? 'Select at least one saved search to include in the feed.'
+                : 'Click "Refresh Feed" to fetch the latest items from your selected searches.'}
           </p>
         </div>
       ) : (
@@ -270,7 +275,7 @@ export const Feed: React.FC = () => {
           {/* Pagination Info */}
           {items.length > 0 && (
             <div className="text-center text-gray-600 mt-8">
-              <p>Showing {items.length} total unique items from {searches.length} searches</p>
+              <p>Showing {items.length} total unique items from {searches.filter((search) => search.includeInFeed).length} searches</p>
             </div>
           )}
         </>

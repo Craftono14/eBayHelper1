@@ -103,6 +103,7 @@ model SavedSearch {
   
   // Metadata
   isActive                Boolean        @default(true)
+  includeInFeed           Boolean        @default(true)
   isEbayImported          Boolean        @default(false) // True if imported from eBay saved searches
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt

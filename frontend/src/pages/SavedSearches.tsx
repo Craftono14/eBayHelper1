@@ -7,6 +7,7 @@ interface SavedSearch {
   searchKeywords: string;
   newResultsCount: number;
   isEbayImported: boolean;
+  includeInFeed: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +47,36 @@ export const SavedSearches: React.FC = () => {
 
     fetchSearches();
   }, [isLoggedIn]);
+
+  const handleIncludeInFeedToggle = async (searchId: number, nextValue: boolean) => {
+    const token = localStorage.getItem('token');
+    const previous = searches;
+
+    setSearches((current) =>
+      current.map((search) =>
+        search.id === searchId ? { ...search, includeInFeed: nextValue } : search
+      )
+    );
+
+    try {
+      const response = await fetch(`/api/searches/${searchId}/feed`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ includeInFeed: nextValue }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update feed preference');
+      }
+    } catch (err) {
+      setSearches(previous);
+      setError(err instanceof Error ? err.message : 'Failed to update feed preference');
+    }
+  };
 
   const handleSyncWithEbay = async () => {
     try {
@@ -171,6 +202,16 @@ export const SavedSearches: React.FC = () => {
               <p className="text-gray-600 mb-4 truncate">
                 <span className="font-medium">Query:</span> {search.searchKeywords}
               </p>
+
+              <label className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+                <input
+                  type="checkbox"
+                  checked={search.includeInFeed ?? true}
+                  onChange={(event) => handleIncludeInFeedToggle(search.id, event.target.checked)}
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                Include in feed?
+              </label>
 
               <div className="mb-6 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-600">
                 <p className="text-center">

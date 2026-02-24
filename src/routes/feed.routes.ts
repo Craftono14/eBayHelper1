@@ -171,12 +171,13 @@ router.post('/refresh', requireAuth, async (req: Request, res: Response): Promis
       return;
     }
 
-    // Fetch all saved searches
+    // Fetch all saved searches included in feed
     const searches = await (prisma.savedSearch as any).findMany({
       where: {
         userId,
         id: { in: searchIds },
         isActive: true,
+        includeInFeed: true,
       },
     });
 
