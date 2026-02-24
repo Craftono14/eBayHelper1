@@ -184,7 +184,7 @@ export const Feed: React.FC = () => {
       ) : (
         <>
           {/* Items Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
+          <div className="feed-grid gap-6 mb-8">
             {items.filter(item => item?.itemId).map((item) => {
               try {
                 const price = item.price?.value ? parseFloat(item.price.value).toFixed(2) : 'N/A';
