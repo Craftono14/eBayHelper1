@@ -29,6 +29,8 @@ interface ItemSummary {
   }>;
   itemWebUrl?: string;
   itemOriginDate?: string; // Listing date for sorting
+  itemCreationDate?: string;
+  itemEndDate?: string;
 }
 
 // Get eBay OAuth app token (client credentials flow)
@@ -112,6 +114,7 @@ async function fetchSearchItems(
     q: searchKeywords,
     sort: 'newlyListed', // Always use newest first for feed
     limit: '50', // Get max results per search
+    fieldgroups: 'EXTENDED',
   };
 
   if (filters.length > 0) {
@@ -119,7 +122,16 @@ async function fetchSearchItems(
   }
 
   if (categoryIds) {
-    params.category_ids = categoryIds;
+    try {
+      const parsed = JSON.parse(categoryIds);
+      if (Array.isArray(parsed)) {
+        params.category_ids = parsed.join(',');
+      } else {
+        params.category_ids = categoryIds;
+      }
+    } catch {
+      params.category_ids = categoryIds;
+    }
   }
 
   try {
@@ -143,7 +155,9 @@ async function fetchSearchItems(
       buyingOptions: item.buyingOptions || [],
       shippingOptions: item.shippingOptions,
       itemWebUrl: item.itemWebUrl,
-      itemOriginDate: item.itemOriginDate, // Include listing date for sorting
+      itemOriginDate: item.itemOriginDate,
+      itemCreationDate: item.itemCreationDate,
+      itemEndDate: item.itemEndDate,
     }));
   } catch (error: any) {
     console.error(`[feed] Error fetching items for "${searchKeywords}":`, error.response?.data || error.message);
@@ -224,10 +238,14 @@ router.post('/refresh', requireAuth, async (req: Request, res: Response): Promis
       }
     }
 
-    // Re-sort all combined items by itemOriginDate (newest first)
+    // Re-sort all combined items by listing date (newest first)
     allItems.sort((a, b) => {
-      const dateA = a.itemOriginDate ? new Date(a.itemOriginDate).getTime() : 0;
-      const dateB = b.itemOriginDate ? new Date(b.itemOriginDate).getTime() : 0;
+      const dateA = new Date(
+        a.itemOriginDate || a.itemCreationDate || a.itemEndDate || 0
+      ).getTime();
+      const dateB = new Date(
+        b.itemOriginDate || b.itemCreationDate || b.itemEndDate || 0
+      ).getTime();
       return dateB - dateA; // Descending order (newest first)
     });
 
