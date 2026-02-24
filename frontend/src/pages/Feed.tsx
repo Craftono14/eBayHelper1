@@ -228,7 +228,7 @@ export const Feed: React.FC = () => {
                       </div>
 
                       {/* Shipping */}
-                      <div className="mb-3 pb-3 border-b border-gray-200">
+                      <div className="mb-3 pb-3 border-b border-gray-200 hidden sm:block">
                         <p className="text-sm text-gray-600">
                           Shipping: <span className="font-semibold">{getShippingCost(item)}</span>
                         </p>
