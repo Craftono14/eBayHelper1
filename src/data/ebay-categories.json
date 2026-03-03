@@ -205,5 +205,40 @@
       "value": "Both",
       "label": "Buy It Now & Auction"
     }
+  ],
+  "currencies": [
+    "USD",
+    "GBP",
+    "EUR",
+    "CAD",
+    "AUD",
+    "JPY",
+    "CNY"
+  ],
+  "sortOptions": [
+    {
+      "value": "BestMatch",
+      "label": "Best Match"
+    },
+    {
+      "value": "EndTime",
+      "label": "Ending Soon"
+    },
+    {
+      "value": "NewlyListed",
+      "label": "Newly Listed"
+    },
+    {
+      "value": "PriceLowest",
+      "label": "Price: Lowest First"
+    },
+    {
+      "value": "PriceHighest",
+      "label": "Price: Highest First"
+    },
+    {
+      "value": "PricePlusShipping",
+      "label": "Price + Shipping"
+    }
   ]
 }

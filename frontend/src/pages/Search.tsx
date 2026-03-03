@@ -36,6 +36,11 @@ export const Search: React.FC = () => {
   const [maxPrice, setMaxPrice] = useState('');
   const [maxOfferPrice, setMaxOfferPrice] = useState('');
   const [searchName, setSearchName] = useState('');
+  const [returns, setReturns] = useState('ignore');
+  const [freeShipping, setFreeShipping] = useState(false);
+  const [searchInDescription, setSearchInDescription] = useState(false);
+  const [currency, setCurrency] = useState('USD');
+  const [sortBy, setSortBy] = useState('BestMatch');
 
   // UI state
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -47,6 +52,8 @@ export const Search: React.FC = () => {
   const conditions = categoriesData.conditions;
   const itemLocations = categoriesData.itemLocations;
   const listingTypes = categoriesData.listingTypes;
+  const currencies = categoriesData.currencies;
+  const sortOptions = categoriesData.sortOptions;
 
   const handleSearch = async () => {
     if (!searchKeywords.trim()) {
@@ -69,6 +76,13 @@ export const Search: React.FC = () => {
         minPrice: minPrice ? parseFloat(minPrice) : null,
         maxPrice: maxPrice ? parseFloat(maxPrice) : null,
         maxOfferPrice: maxOfferPrice ? parseFloat(maxOfferPrice) : null,
+        returnsAccepted: returns === 'accepted',
+        freeReturns: returns === 'free',
+        freeShipping,
+        searchInDescription,
+        currency,
+        sortBy,
+        sortOrder: 'Ascending', // Default sort order
       };
 
       // Create search or just perform search
@@ -384,6 +398,80 @@ export const Search: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               step="0.01"
             />
+          </div>
+
+          {/* Returns Filter */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Returns</label>
+            <select
+              value={returns}
+              onChange={(e) => setReturns(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              <option value="ignore">Ignore Returns</option>
+              <option value="accepted">Returns Accepted</option>
+              <option value="free">Free Returns</option>
+            </select>
+          </div>
+
+          {/* Free Shipping */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="freeShipping"
+              checked={freeShipping}
+              onChange={(e) => setFreeShipping(e.target.checked)}
+              className="w-4 h-4 rounded"
+            />
+            <label htmlFor="freeShipping" className="ml-3 text-sm font-semibold cursor-pointer">
+              Free Shipping Only
+            </label>
+          </div>
+
+          {/* Search in Description */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="searchInDescription"
+              checked={searchInDescription}
+              onChange={(e) => setSearchInDescription(e.target.checked)}
+              className="w-4 h-4 rounded"
+            />
+            <label htmlFor="searchInDescription" className="ml-3 text-sm font-semibold cursor-pointer">
+              Search in Description
+            </label>
+          </div>
+
+          {/* Currency */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Currency</label>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              {currencies.map((curr) => (
+                <option key={curr} value={curr}>
+                  {curr}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort By */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              {sortOptions.map((sort) => (
+                <option key={sort.value} value={sort.value}>
+                  {sort.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Search Name (for saving) */}

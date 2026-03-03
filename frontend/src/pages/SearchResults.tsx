@@ -209,6 +209,19 @@ export const SearchResults: React.FC = () => {
         } else if (tempSearch.buyingFormat === 'Both') {
           filters.push('buyingOptions:{AUCTION|FIXED_PRICE}');
         }
+
+        // Free shipping filter
+        if (tempSearch.freeShipping) {
+          filters.push('maxDeliveryCost:0');
+        }
+
+        // Returns filters
+        if (tempSearch.returnsAccepted) {
+          filters.push('return_accepted:true');
+        }
+        if (tempSearch.freeReturns) {
+          filters.push('return_method:FREE');
+        }
         
         setFilterParam(filters.join(','));
         
@@ -217,7 +230,9 @@ export const SearchResults: React.FC = () => {
           setCategoryIds(tempSearch.categories.join(','));
         }
         
-        setSortParam('newlyListed'); // Default sort for new searches
+        // Use sort preference from search, map to Browse API format
+        const searchSort = mapSortToBrowseAPI(tempSearch.sortBy, 'Ascending');
+        setSortParam(searchSort || 'newlyListed');
         
         // Clear temporary search from localStorage after loading
         localStorage.removeItem('temporarySearch');
