@@ -166,6 +166,44 @@ async function fetchSearchItems(
 }
 
 /**
+ * GET /api/feed
+ * Get cached feed results if available
+ */
+router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Get cached feed if exists
+    const feedCache = await (prisma.feedCache as any).findUnique({
+      where: { userId },
+    });
+
+    if (feedCache) {
+      console.log(`[feed] Retrieved cached feed for user ${userId}`);
+      res.json({
+        items: feedCache.items || [],
+        cached: true,
+        cachedAt: feedCache.updatedAt,
+      });
+    } else {
+      console.log(`[feed] No cached feed found for user ${userId}`);
+      res.json({
+        items: [],
+        cached: false,
+      });
+    }
+  } catch (error: any) {
+    console.error('[feed] Error retrieving cached feed:', error.message);
+    res.status(500).json({ error: 'Failed to retrieve cached feed' });
+  }
+});
+
+/**
  * POST /api/feed/refresh
  * Refresh feed by combining results from multiple saved searches
  * Body: { searchIds: number[] }
@@ -250,6 +288,19 @@ router.post('/refresh', requireAuth, async (req: Request, res: Response): Promis
     });
 
     console.log(`[feed] Feed refresh complete: ${allItems.length} total unique items from ${searches.length} searches, re-sorted by newest first`);
+
+    // Cache the feed results
+    try {
+      await (prisma.feedCache as any).upsert({
+        where: { userId },
+        update: { items: allItems },
+        create: { userId, items: allItems },
+      });
+      console.log(`[feed] Cached feed results for user ${userId}`);
+    } catch (cacheError: any) {
+      console.error(`[feed] Warning: Failed to cache feed results:`, cacheError.message);
+      // Don't fail the request if caching fails
+    }
 
     res.json({
       items: allItems,

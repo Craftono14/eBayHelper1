@@ -42,8 +42,43 @@ export const Feed: React.FC = () => {
   const [error, setError] = useState('');
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [lastRefreshTime, setLastRefreshTime] = useState<string>('');
+  const [isCached, setIsCached] = useState(false);
 
   const token = localStorage.getItem('token');
+
+  // Load cached feed results on page load
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const loadCachedFeed = async () => {
+      try {
+        const response = await fetch('/api/feed', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          console.error('[Feed] Failed to load cached feed');
+          return;
+        }
+
+        const data = await response.json();
+        if (data.items && data.items.length > 0) {
+          console.log('[Feed] Loaded cached feed with', data.items.length, 'items');
+          setItems(data.items);
+          setIsCached(data.cached);
+          if (data.cachedAt) {
+            setLastRefreshTime(`Cached: ${new Date(data.cachedAt).toLocaleString()}`);
+          }
+        }
+      } catch (err) {
+        console.error('[Feed] Error loading cached feed:', err);
+      }
+    };
+
+    loadCachedFeed();
+  }, [isLoggedIn, token]);
 
   // Fetch saved searches list
   useEffect(() => {
@@ -110,6 +145,7 @@ export const Feed: React.FC = () => {
       // Items are already sorted by newest first from backend
       setItems(data.items);
       setLastRefreshTime(new Date().toLocaleString());
+      setIsCached(false); // Clear cached indicator after fresh refresh
     } catch (err) {
       console.error('[Feed] Error refreshing:', err);
       setError(err instanceof Error ? err.message : 'Failed to refresh feed');
@@ -164,7 +200,7 @@ export const Feed: React.FC = () => {
 
         {lastRefreshTime && (
           <p className="text-sm text-gray-500">
-            Last refreshed: {lastRefreshTime}
+            {isCached ? '💾 ' : ''}Last {isCached ? 'cached' : 'refreshed'}: {lastRefreshTime}
           </p>
         )}
       </div>

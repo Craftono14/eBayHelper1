@@ -29,6 +29,7 @@ model User {
   savedSearches           SavedSearch[]  @relation("UserSavedSearches")
   wishlistItems           WishlistItem[] @relation("UserWishlistItems")
   itemHistories           ItemHistory[]  @relation("UserItemHistories")
+  feedCache               FeedCache?     @relation("UserFeedCache")
   
   // Account deletion compliance (GDPR/eBay policy)
   deletedAt               DateTime?      // Soft delete timestamp for compliance
@@ -118,6 +119,22 @@ model SavedSearch {
   @@index([userId])
   @@index([isActive])
   @@map("saved_searches")
+}
+
+// FeedCache model - Stores cached feed results for persistence
+model FeedCache {
+  id                      Int            @id @default(autoincrement())
+  userId                  Int            @unique
+  user                    User           @relation("UserFeedCache", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Cached items as JSON (stored as jsonb in PostgreSQL)
+  items                   Json           // Array of ItemSummary objects
+  
+  // Metadata for tracking cache staleness
+  updatedAt               DateTime       @updatedAt
+  
+  @@index([userId])
+  @@map("feed_cache")
 }
 
 // WishlistItem model - Tracks individual items user is interested in
