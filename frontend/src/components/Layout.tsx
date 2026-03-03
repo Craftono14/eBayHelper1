@@ -29,6 +29,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">
               Home
             </Link>
+            <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">
+              New Search
+            </Link>
             <Link to="/saved-searches" className="text-gray-700 hover:text-blue-600 font-medium">
               Saved Searches
             </Link>
@@ -73,6 +76,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         <div className="md:hidden bg-gray-100 px-4 py-2 space-y-2">
           <Link to="/" className="block text-gray-700 hover:text-blue-600 font-medium">
             Home
+          </Link>
+          <Link to="/search" className="block text-gray-700 hover:text-blue-600 font-medium">
+            New Search
           </Link>
           <Link to="/saved-searches" className="block text-gray-700 hover:text-blue-600 font-medium">
             Saved Searches

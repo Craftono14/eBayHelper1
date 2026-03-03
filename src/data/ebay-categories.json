@@ -1,0 +1,209 @@
+{
+  "categories": [
+    {
+      "id": "15687",
+      "name": "Art",
+      "subcategories": [
+        {
+          "id": "2984",
+          "name": "Art Prints",
+          "subsubcategories": []
+        },
+        {
+          "id": "14339",
+          "name": "Paintings & Drawing",
+          "subsubcategories": []
+        },
+        {
+          "id": "37903",
+          "name": "Photographs",
+          "subsubcategories": []
+        }
+      ]
+    },
+    {
+      "id": "550",
+      "name": "Books & Magazines",
+      "subcategories": [
+        {
+          "id": "267",
+          "name": "Antiquarian & Collectible",
+          "subsubcategories": []
+        },
+        {
+          "id": "4271",
+          "name": "Fiction & Literature",
+          "subsubcategories": []
+        },
+        {
+          "id": "2748",
+          "name": "Non-Fiction",
+          "subsubcategories": []
+        }
+      ]
+    },
+    {
+      "id": "625",
+      "name": "Business & Industrial",
+      "subcategories": [
+        {
+          "id": "2334",
+          "name": "Advertising & Marketing",
+          "subsubcategories": []
+        },
+        {
+          "id": "12576",
+          "name": "Office Equipment & Supplies",
+          "subsubcategories": []
+        }
+      ]
+    },
+    {
+      "id": "1",
+      "name": "Collectibles",
+      "subcategories": [
+        {
+          "id": "550",
+          "name": "Advertising",
+          "subsubcategories": []
+        },
+        {
+          "id": "4713",
+          "name": "Animals",
+          "subsubcategories": []
+        },
+        {
+          "id": "11450",
+          "name": "Autographs",
+          "subsubcategories": []
+        }
+      ]
+    },
+    {
+      "id": "11232",
+      "name": "Clothing, Shoes & Accessories",
+      "subcategories": [
+        {
+          "id": "15687",
+          "name": "Men's Clothing",
+          "subsubcategories": []
+        },
+        {
+          "id": "15688",
+          "name": "Women's Clothing",
+          "subsubcategories": []
+        },
+        {
+          "id": "3034",
+          "name": "Shoes",
+          "subsubcategories": []
+        }
+      ]
+    },
+    {
+      "id": "14339",
+      "name": "Electronics",
+      "subcategories": [
+        {
+          "id": "15687",
+          "name": "Cell Phones & Accessories",
+          "subsubcategories": [
+            {
+              "id": "109640",
+              "name": "Cell Phones"
+            },
+            {
+              "id": "109641",
+              "name": "Phone Accessories"
+            }
+          ]
+        },
+        {
+          "id": "4272",
+          "name": "Computers & Peripherals",
+          "subsubcategories": [
+            {
+              "id": "175670",
+              "name": "Laptops & Netbooks"
+            },
+            {
+              "id": "175672",
+              "name": "Desktops & All-In-Ones"
+            }
+          ]
+        },
+        {
+          "id": "42046",
+          "name": "Consumer Electronics",
+          "subsubcategories": []
+        }
+      ]
+    },
+    {
+      "id": "550",
+      "name": "Home & Garden",
+      "subcategories": [
+        {
+          "id": "1400",
+          "name": "Furniture",
+          "subsubcategories": []
+        },
+        {
+          "id": "2618",
+          "name": "Kitchen & Dining",
+          "subsubcategories": []
+        }
+      ]
+    },
+    {
+      "id": "14996",
+      "name": "Toys & Games",
+      "subcategories": [
+        {
+          "id": "220",
+          "name": "Action Figures",
+          "subsubcategories": []
+        },
+        {
+          "id": "37902",
+          "name": "Board Games",
+          "subsubcategories": []
+        },
+        {
+          "id": "14995",
+          "name": "Video Games",
+          "subsubcategories": []
+        }
+      ]
+    }
+  ],
+  "conditions": [
+    "New",
+    "Refurbished",
+    "Used",
+    "For parts or not working"
+  ],
+  "itemLocations": [
+    "US",
+    "Canada",
+    "UK",
+    "Australia",
+    "Germany",
+    "France",
+    "All Locations"
+  ],
+  "listingTypes": [
+    {
+      "value": "Buy It Now",
+      "label": "Buy It Now"
+    },
+    {
+      "value": "Auction",
+      "label": "Auction"
+    },
+    {
+      "value": "Both",
+      "label": "Buy It Now & Auction"
+    }
+  ]
+}

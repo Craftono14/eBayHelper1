@@ -165,7 +165,71 @@ export const SearchResults: React.FC = () => {
 
   // Fetch search details first
   useEffect(() => {
-    if (!isLoggedIn || !searchId) return;
+    if (!isLoggedIn) return;
+
+    // Check if this is a temporary search from localStorage
+    const tempSearchStr = localStorage.getItem('temporarySearch');
+    if (tempSearchStr && !searchId) {
+      try {
+        const tempSearch = JSON.parse(tempSearchStr);
+        console.log('[SearchResults] Loaded temporary search:', tempSearch);
+        
+        setSearchName('Temporary Search');
+        setSearchQuery(tempSearch.searchKeywords || '');
+        
+        // Build filter string from temporary search
+        const filters: string[] = [];
+        
+        if (tempSearch.minPrice && tempSearch.maxPrice) {
+          filters.push(`price:[${tempSearch.minPrice}..${tempSearch.maxPrice}]`);
+        } else if (tempSearch.minPrice) {
+          filters.push(`price:[${tempSearch.minPrice}..]`);
+        } else if (tempSearch.maxPrice) {
+          filters.push(`price:[..${tempSearch.maxPrice}]`);
+        }
+        
+        if (tempSearch.condition) {
+          const conditionMap: Record<string, string> = {
+            'New': 'NEW',
+            'Used': 'USED',
+            'Refurbished': 'REFURBISHED',
+            'For parts or not working': 'FOR_PARTS_OR_NOT_WORKING',
+          };
+          const browseCondition = conditionMap[tempSearch.condition] || tempSearch.condition.toUpperCase().replace(/ /g, '_');
+          filters.push(`conditions:{${browseCondition}}`);
+        }
+        
+        if (tempSearch.buyingFormat && tempSearch.buyingFormat !== 'Both') {
+          const formatMap: Record<string, string> = {
+            'Auction': 'AUCTION',
+            'Buy It Now': 'FIXED_PRICE',
+          };
+          const browseFormat = formatMap[tempSearch.buyingFormat] || 'FIXED_PRICE';
+          filters.push(`buyingOptions:{${browseFormat}}`);
+        } else if (tempSearch.buyingFormat === 'Both') {
+          filters.push('buyingOptions:{AUCTION|FIXED_PRICE}');
+        }
+        
+        setFilterParam(filters.join(','));
+        
+        // Set category IDs
+        if (tempSearch.categories && Array.isArray(tempSearch.categories)) {
+          setCategoryIds(tempSearch.categories.join(','));
+        }
+        
+        setSortParam('newlyListed'); // Default sort for new searches
+        
+        // Clear temporary search from localStorage after loading
+        localStorage.removeItem('temporarySearch');
+      } catch (err) {
+        console.error('[SearchResults] Failed to parse temporary search:', err);
+        setError('Failed to load search parameters');
+      }
+      return;
+    }
+
+    // Original behavior: fetch saved search details from backend
+    if (!searchId) return;
 
     const fetchSearchDetails = async () => {
       try {

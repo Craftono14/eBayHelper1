@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
+import { Search } from './pages/Search';
 import { SavedSearches } from './pages/SavedSearches';
 import { SearchResults } from './pages/SearchResults';
 import { Feed } from './pages/Feed';
@@ -20,8 +21,10 @@ function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/search" element={<Search />} />
             <Route path="/saved-searches" element={<SavedSearches />} />
             <Route path="/search/:searchId" element={<SearchResults />} />
+            <Route path="/search-results" element={<SearchResults />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/login" element={<Login />} />
