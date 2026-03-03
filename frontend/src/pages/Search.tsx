@@ -3,6 +3,33 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import categoriesData from '../data/ebay-categories.json';
 
+interface ItemSummary {
+  itemId: string;
+  title: string;
+  image?: {
+    imageUrl: string;
+  };
+  price?: {
+    value: string;
+    currency: string;
+  };
+  buyingOptions: string[];
+  shippingOptions?: Array<{
+    shippingCost?: {
+      value: string;
+      currency: string;
+    };
+  }>;
+  itemWebUrl?: string;
+}
+
+interface SearchResponse {
+  items: ItemSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 interface Category {
   id: string;
   name: string;
@@ -47,6 +74,8 @@ export const Search: React.FC = () => {
   const [expandedSubcategory, setExpandedSubcategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [items, setItems] = useState<ItemSummary[]>([]);
+  const [total, setTotal] = useState(0);
 
   const categories: Category[] = categoriesData.categories;
   const conditions = categoriesData.conditions;
@@ -54,6 +83,81 @@ export const Search: React.FC = () => {
   const listingTypes = categoriesData.listingTypes;
   const currencies = categoriesData.currencies;
   const sortOptions = categoriesData.sortOptions;
+
+  const mapSortToBrowseAPI = (savedSearchSort: string): string => {
+    const sortMap: Record<string, string> = {
+      EndTime: 'endingSoonest',
+      EndTimeSoonest: 'endingSoonest',
+      NewlyListed: 'newlyListed',
+      RecentlyListed: 'newlyListed',
+      StartDate: 'newlyListed',
+      CurrentPriceLowest: 'price',
+      PriceLowest: 'price',
+      CurrentPriceHighest: '-price',
+      PriceHighest: '-price',
+      BestMatch: '',
+      '': '',
+    };
+
+    if (savedSearchSort === 'PricePlusShipping') {
+      return 'price';
+    }
+
+    return sortMap[savedSearchSort] ?? '';
+  };
+
+  const buildFilterString = (filters: {
+    minPrice: number | null;
+    maxPrice: number | null;
+    currency: string;
+    condition: string | null;
+    buyingFormat: string;
+    freeShipping: boolean;
+  }): string => {
+    const parts: string[] = [];
+
+    if (filters.minPrice !== null && filters.maxPrice !== null) {
+      parts.push(`price:[${filters.minPrice}..${filters.maxPrice}]`);
+    } else if (filters.minPrice !== null) {
+      parts.push(`price:[${filters.minPrice}..]`);
+    } else if (filters.maxPrice !== null) {
+      parts.push(`price:[..${filters.maxPrice}]`);
+    }
+
+    if (filters.currency) {
+      parts.push(`priceCurrency:${filters.currency}`);
+    }
+
+    if (filters.condition) {
+      const conditionMap: Record<string, string> = {
+        New: 'NEW',
+        Used: 'USED',
+        Refurbished: 'REFURBISHED',
+        'For parts or not working': 'FOR_PARTS_OR_NOT_WORKING',
+      };
+      const browseCondition =
+        conditionMap[filters.condition] || filters.condition.toUpperCase().replace(/ /g, '_');
+      parts.push(`conditions:{${browseCondition}}`);
+    }
+
+    if (filters.buyingFormat) {
+      const formatMap: Record<string, string> = {
+        Auction: 'AUCTION',
+        'Buy It Now': 'FIXED_PRICE',
+        FixItPrice: 'FIXED_PRICE',
+        AuctionWithBIN: 'AUCTION|FIXED_PRICE',
+        Both: 'AUCTION|FIXED_PRICE',
+      };
+      const browseFormat = formatMap[filters.buyingFormat] || 'FIXED_PRICE';
+      parts.push(`buyingOptions:{${browseFormat}}`);
+    }
+
+    if (filters.freeShipping) {
+      parts.push('maxDeliveryCost:0');
+    }
+
+    return parts.join(',');
+  };
 
   const handleSearch = async () => {
     if (!searchKeywords.trim()) {
@@ -68,7 +172,7 @@ export const Search: React.FC = () => {
       // Build filter object
       const filters = {
         searchKeywords,
-        categories: selectedCategories.length > 0 ? JSON.stringify(selectedCategories) : null,
+        categories: selectedCategories,
         condition: selectedConditions.length > 0 ? selectedConditions[0] : null,
         minFeedback: minFeedback ? parseInt(minFeedback) : null,
         itemLocation: itemLocation !== 'All Locations' ? itemLocation : null,
@@ -85,9 +189,56 @@ export const Search: React.FC = () => {
         sortOrder: 'Ascending', // Default sort order
       };
 
-      // Create search or just perform search
+      if (selectedCategories.length <= 1) {
+        const sortParam = mapSortToBrowseAPI(filters.sortBy);
+        const filterParam = buildFilterString({
+          minPrice: filters.minPrice,
+          maxPrice: filters.maxPrice,
+          currency: filters.currency,
+          condition: filters.condition,
+          buyingFormat: filters.buyingFormat,
+          freeShipping: filters.freeShipping,
+        });
+
+        let url = `/api/browse/search?q=${encodeURIComponent(filters.searchKeywords)}&limit=50&offset=0`;
+        if (sortParam) {
+          url += `&sort=${encodeURIComponent(sortParam)}`;
+        }
+        if (filterParam) {
+          url += `&filter=${encodeURIComponent(filterParam)}`;
+        }
+        if (filters.categories.length === 1) {
+          url += `&category_ids=${encodeURIComponent(filters.categories[0])}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to search items');
+        }
+
+        const data: SearchResponse = await response.json();
+        setItems(data.items || []);
+        setTotal(data.total || 0);
+      } else {
+        localStorage.setItem(
+          'temporarySearch',
+          JSON.stringify({
+            searchKeywords: filters.searchKeywords,
+            categories: filters.categories,
+            condition: filters.condition,
+            buyingFormat: filters.buyingFormat,
+            minPrice: filters.minPrice,
+            maxPrice: filters.maxPrice,
+            freeShipping: filters.freeShipping,
+            currency: filters.currency,
+            sortBy: filters.sortBy,
+          })
+        );
+        navigate('/search-results');
+      }
+
       if (searchName) {
-        // Save search and then navigate
         const response = await fetch('/api/searches', {
           method: 'POST',
           headers: {
@@ -105,19 +256,28 @@ export const Search: React.FC = () => {
           throw new Error(errorData.error || 'Failed to create search');
         }
 
-        const data = await response.json();
-        navigate(`/searches/${data.id}`);
-      } else {
-        // Just perform search without saving
-        // Store search params and navigate to results
-        localStorage.setItem('temporarySearch', JSON.stringify(filters));
-        navigate('/search-results');
+        await response.json();
       }
     } catch (err) {
       console.error('[Search] Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to perform search');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getShippingCost = (item: ItemSummary): string => {
+    try {
+      if (!item.shippingOptions || item.shippingOptions.length === 0) {
+        return 'Check item';
+      }
+      const shippingValue = item.shippingOptions[0]?.shippingCost?.value;
+      if (!shippingValue) {
+        return 'Check item';
+      }
+      return `$${parseFloat(shippingValue).toFixed(2)}`;
+    } catch {
+      return 'Check item';
     }
   };
 
@@ -499,7 +659,91 @@ export const Search: React.FC = () => {
           >
             {loading ? 'Searching...' : 'Search eBay'}
           </button>
+
+          {selectedCategories.length > 1 && (
+            <p className="text-xs text-gray-500">
+              Multi-category live results are not enabled yet. For now, this search opens the results page.
+            </p>
+          )}
         </div>
+      </div>
+
+      <div className="mt-10 border-t border-gray-200 pt-8">
+        <h2 className="text-2xl font-bold mb-2">Search Results</h2>
+        <p className="text-sm text-gray-500 mb-6">{total} items found</p>
+
+        {items.length === 0 ? (
+          <div className="bg-gray-100 rounded-lg p-10 text-center">
+            <p className="text-gray-600">Run a search to see results here.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+            {items.filter((item) => item?.itemId).map((item) => {
+              const price = item.price?.value ? parseFloat(item.price.value).toFixed(2) : 'N/A';
+
+              return (
+                <a
+                  key={item.itemId}
+                  href={item.itemWebUrl || `https://www.ebay.com/itm/${item.itemId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden flex flex-col group"
+                >
+                  <div className="w-full h-44 bg-gray-100 overflow-hidden flex items-center justify-center">
+                    {item.image?.imageUrl ? (
+                      <img
+                        src={item.image.imageUrl}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition"
+                      />
+                    ) : (
+                      <span className="text-xs text-gray-500">No image</span>
+                    )}
+                  </div>
+
+                  <div className="p-3 flex-1 flex flex-col">
+                    <h3 className="text-sm font-semibold mb-2 line-clamp-2 group-hover:text-blue-600">
+                      {item.title || 'Untitled Item'}
+                    </h3>
+
+                    <div className="flex-1" />
+
+                    <p className="text-lg font-bold text-blue-600 mb-2">
+                      {price === 'N/A' ? 'Price N/A' : `$${price}`}
+                    </p>
+
+                    <p className="text-xs text-gray-600 mb-2">
+                      Shipping: <span className="font-semibold">{getShippingCost(item)}</span>
+                    </p>
+
+                    <div className="flex flex-wrap gap-1">
+                      {item.buyingOptions?.length ? (
+                        item.buyingOptions.map((option) => (
+                          <span
+                            key={option}
+                            className={`text-xs px-2 py-1 rounded ${
+                              option === 'FIXED_PRICE'
+                                ? 'bg-green-100 text-green-800'
+                                : option === 'AUCTION'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {option === 'FIXED_PRICE' ? 'Buy It Now' : option}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-800">
+                          Unknown
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
