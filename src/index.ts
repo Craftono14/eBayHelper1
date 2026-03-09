@@ -45,7 +45,7 @@ app.use(
         imgSrc: ["'self'", 'data:', 'https://thumbs*.ebayimg.com', 'https://*.ebayimg.com', 'https://ebay.com', 'https://*.ebay.com'],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'", 'https://api.ebay.com', 'https://api.sandbox.ebay.com'],
+        connectSrc: ["'self'", 'http://localhost:*', 'http://127.0.0.1:*', 'https://api.ebay.com', 'https://api.sandbox.ebay.com'],
       },
     },
   })
