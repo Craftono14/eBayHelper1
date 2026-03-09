@@ -32,6 +32,7 @@ export const Wishlist: React.FC = () => {
   const [filter, setFilter] = useState<'active' | 'ended' | 'all'>('all');
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
+  const [triggeredAlerts, setTriggeredAlerts] = useState<string[]>([]);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [targetPriceInput, setTargetPriceInput] = useState<string>('');
@@ -73,6 +74,7 @@ export const Wishlist: React.FC = () => {
     try {
       setSyncing(true);
       setSyncMessage('');
+      setTriggeredAlerts([]);
       setError('');
       const token = localStorage.getItem('token');
       const response = await fetch('/api/sync/ebay', {
@@ -90,6 +92,7 @@ export const Wishlist: React.FC = () => {
 
       const data = await response.json();
       setSyncMessage(`Synced ${data.details.total} items (${data.details.watchlistItems} watchlist items)`);
+      setTriggeredAlerts(Array.isArray(data?.details?.alertsTriggered) ? data.details.alertsTriggered : []);
       await fetchWishlist();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sync with eBay');
@@ -242,6 +245,14 @@ export const Wishlist: React.FC = () => {
       {syncMessage && (
         <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
           {syncMessage}
+        </div>
+      )}
+
+      {triggeredAlerts.length > 0 && (
+        <div className="bg-yellow-100 text-yellow-900 p-4 rounded-lg mb-6">
+          {triggeredAlerts.map((itemName, index) => (
+            <div key={`${itemName}-${index}`}>Price alert for {itemName} was triggered</div>
+          ))}
         </div>
       )}
 

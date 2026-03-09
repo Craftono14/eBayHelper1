@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { ebaySyncService } from '../services/ebaySync.service';
+import { PrismaClient } from '@prisma/client';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 /**
  * POST /api/sync/ebay
@@ -12,6 +14,7 @@ const router = Router();
 router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<any> => {
   try {
     const userId = (req as any).user?.id;
+    const syncStartedAt = new Date();
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -39,6 +42,30 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       // Continue to return partial results
     }
 
+    // Find any price alerts that were triggered by this sync run.
+    const recentlySyncedItems = await prisma.wishlistItem.findMany({
+      where: {
+        userId,
+        isEbayImported: true,
+        updatedAt: { gte: syncStartedAt },
+        targetPrice: { not: null },
+        currentPrice: { not: null },
+      },
+      select: {
+        itemTitle: true,
+        currentPrice: true,
+        targetPrice: true,
+      },
+    });
+
+    const alertsTriggered = recentlySyncedItems
+      .filter((item) => {
+        const currentPrice = Number(item.currentPrice);
+        const targetPrice = Number(item.targetPrice);
+        return Number.isFinite(currentPrice) && Number.isFinite(targetPrice) && currentPrice <= targetPrice;
+      })
+      .map((item) => item.itemTitle || 'Untitled Item');
+
     const totalCount = searchesCount + watchlistCount;
 
     return res.json({
@@ -48,6 +75,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
         savedSearches: searchesCount,
         watchlistItems: watchlistCount,
         total: totalCount,
+        alertsTriggered,
       },
     });
   } catch (error: any) {
