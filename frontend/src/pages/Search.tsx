@@ -94,11 +94,10 @@ export const Search: React.FC = () => {
     currencies: ['USD', 'GBP', 'EUR', 'CAD', 'AUD', 'JPY', 'CNY'],
     sortOptions: [
       { value: 'BestMatch', label: 'Best Match' },
-      { value: 'EndTime', label: 'Ending Soon' },
+      { value: 'EndTimeSoonest', label: 'Ending Soonest' },
       { value: 'NewlyListed', label: 'Newly Listed' },
-      { value: 'PriceLowest', label: 'Price: Lowest First' },
-      { value: 'PriceHighest', label: 'Price: Highest First' },
-      { value: 'PricePlusShipping', label: 'Price + Shipping' },
+      { value: 'PricePlusShippingLowest', label: 'Price + Shipping Lowest First' },
+      { value: 'PricePlusShippingHighest', label: 'Price + Shipping Highest First' },
     ],
   });
 
@@ -108,6 +107,14 @@ export const Search: React.FC = () => {
   const listingTypes = categoryConfig.listingTypes;
   const currencies = categoryConfig.currencies;
   const sortOptions = categoryConfig.sortOptions;
+
+  const isPricePlusShippingSort = (sortValue: string): boolean => {
+    return (
+      sortValue === 'PricePlusShippingLowest' ||
+      sortValue === 'PricePlusShippingHighest' ||
+      sortValue === 'PricePlusShipping'
+    );
+  };
 
   useEffect(() => {
     const loadCategoryConfig = async () => {
@@ -194,6 +201,8 @@ export const Search: React.FC = () => {
       PriceLowest: 'price',
       CurrentPriceHighest: '-price',
       PriceHighest: '-price',
+      PricePlusShippingLowest: 'price',
+      PricePlusShippingHighest: '-price',
       BestMatch: '',
       '': '',
     };
@@ -212,6 +221,7 @@ export const Search: React.FC = () => {
     condition: string | null;
     buyingFormat: string;
     freeShipping: boolean;
+    sortBy: string;
   }): string => {
     const parts: string[] = [];
 
@@ -255,6 +265,10 @@ export const Search: React.FC = () => {
       parts.push('maxDeliveryCost:0');
     }
 
+    if (isPricePlusShippingSort(filters.sortBy)) {
+      parts.push('deliveryPostalCode:80011');
+    }
+
     return parts.join(',');
   };
 
@@ -285,7 +299,7 @@ export const Search: React.FC = () => {
         searchInDescription,
         currency,
         sortBy,
-        sortOrder: 'Ascending', // Default sort order
+        sortOrder: sortBy === 'PricePlusShippingHighest' ? 'Descending' : 'Ascending',
       };
 
       if (selectedCategories.length <= 1) {
@@ -297,6 +311,7 @@ export const Search: React.FC = () => {
           condition: filters.condition,
           buyingFormat: filters.buyingFormat,
           freeShipping: filters.freeShipping,
+          sortBy: filters.sortBy,
         });
 
         let url = `/api/browse/search?q=${encodeURIComponent(filters.searchKeywords)}&limit=50&offset=0`;
@@ -332,6 +347,7 @@ export const Search: React.FC = () => {
             freeShipping: filters.freeShipping,
             currency: filters.currency,
             sortBy: filters.sortBy,
+            sortOrder: filters.sortOrder,
           })
         );
         navigate('/search-results');

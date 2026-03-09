@@ -105066,24 +105066,20 @@
       "label": "Best Match"
     },
     {
-      "value": "EndTime",
-      "label": "Ending Soon"
+      "value": "EndTimeSoonest",
+      "label": "Ending Soonest"
     },
     {
       "value": "NewlyListed",
       "label": "Newly Listed"
     },
     {
-      "value": "PriceLowest",
-      "label": "Price: Lowest First"
+      "value": "PricePlusShippingLowest",
+      "label": "Price + Shipping Lowest First"
     },
     {
-      "value": "PriceHighest",
-      "label": "Price: Highest First"
-    },
-    {
-      "value": "PricePlusShipping",
-      "label": "Price + Shipping"
+      "value": "PricePlusShippingHighest",
+      "label": "Price + Shipping Highest First"
     }
   ]
 }

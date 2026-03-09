@@ -86,6 +86,8 @@ export const SearchResults: React.FC = () => {
       'PriceLowest': 'price',              // Lowest price first
       'CurrentPriceHighest': '-price',     // Highest price first
       'PriceHighest': '-price',            // Highest price first
+      'PricePlusShippingLowest': 'price',  // Price+shipping lowest first
+      'PricePlusShippingHighest': '-price',// Price+shipping highest first
       
       // Price plus shipping - depends on sort order
       'PricePlusShipping': sortOrder === 'Descending' ? '-price' : 'price',  // Use sort order to determine direction
@@ -158,6 +160,14 @@ export const SearchResults: React.FC = () => {
       filters.push('maxDeliveryCost:0');
     }
 
+    if (
+      search.sortBy === 'PricePlusShipping' ||
+      search.sortBy === 'PricePlusShippingLowest' ||
+      search.sortBy === 'PricePlusShippingHighest'
+    ) {
+      filters.push('deliveryPostalCode:80011');
+    }
+
     const filterString = filters.join(',');
     console.log('[SearchResults] Built filter string:', filterString);
     return filterString;
@@ -215,6 +225,14 @@ export const SearchResults: React.FC = () => {
           filters.push('maxDeliveryCost:0');
         }
 
+        if (
+          tempSearch.sortBy === 'PricePlusShipping' ||
+          tempSearch.sortBy === 'PricePlusShippingLowest' ||
+          tempSearch.sortBy === 'PricePlusShippingHighest'
+        ) {
+          filters.push('deliveryPostalCode:80011');
+        }
+
         // Returns filters
         if (tempSearch.returnsAccepted) {
           filters.push('return_accepted:true');
@@ -231,7 +249,7 @@ export const SearchResults: React.FC = () => {
         }
         
         // Use sort preference from search, map to Browse API format
-        const searchSort = mapSortToBrowseAPI(tempSearch.sortBy, 'Ascending');
+        const searchSort = mapSortToBrowseAPI(tempSearch.sortBy, tempSearch.sortOrder || 'Ascending');
         setSortParam(searchSort || 'newlyListed');
         
         // Clear temporary search from localStorage after loading

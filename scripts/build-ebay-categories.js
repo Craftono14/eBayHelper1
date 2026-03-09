@@ -2,7 +2,11 @@ const fs = require('fs');
 const path = require('path');
 
 const csvPath = path.join(__dirname, '..', 'src', 'data', 'US_New_Structure_(May2023).csv');
-const outputPath = path.join(__dirname, '..', 'frontend', 'src', 'data', 'ebay-categories.json');
+const outputPaths = [
+  path.join(__dirname, '..', 'frontend', 'public', 'ebay-categories.json'),
+  path.join(__dirname, '..', 'frontend', 'src', 'data', 'ebay-categories.json'),
+  path.join(__dirname, '..', 'src', 'data', 'ebay-categories.json'),
+];
 
 function parseCsvLine(line) {
   const values = [];
@@ -108,13 +112,15 @@ const output = {
   currencies: ['USD', 'GBP', 'EUR', 'CAD', 'AUD', 'JPY', 'CNY'],
   sortOptions: [
     { value: 'BestMatch', label: 'Best Match' },
-    { value: 'EndTime', label: 'Ending Soon' },
+    { value: 'EndTimeSoonest', label: 'Ending Soonest' },
     { value: 'NewlyListed', label: 'Newly Listed' },
-    { value: 'PriceLowest', label: 'Price: Lowest First' },
-    { value: 'PriceHighest', label: 'Price: Highest First' },
-    { value: 'PricePlusShipping', label: 'Price + Shipping' },
+    { value: 'PricePlusShippingLowest', label: 'Price + Shipping Lowest First' },
+    { value: 'PricePlusShippingHighest', label: 'Price + Shipping Highest First' },
   ],
 };
 
-fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
-console.log(`Generated ${outputPath} with ${categories.length} top-level categories.`);
+for (const outputPath of outputPaths) {
+  fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
+}
+
+console.log(`Generated category config to ${outputPaths.length} files with ${categories.length} top-level categories.`);
