@@ -118,7 +118,7 @@ router.post('/discord-settings/test', requireAuth, async (req: AuthRequest, res)
       });
     }
 
-    const sent = await sendPriceAlertDM(
+    const result = await sendPriceAlertDM(
       { discordId: user.discordId },
       {
         itemName: '[TEST] eBay Helper Notification',
@@ -128,9 +128,9 @@ router.post('/discord-settings/test', requireAuth, async (req: AuthRequest, res)
       }
     );
 
-    if (!sent) {
+    if (!result.success) {
       return res.status(502).json({
-        error: 'Failed to send test Discord DM. Check server logs for Discord API error details.',
+        error: `Failed to send test Discord DM. ${result.error || 'Check server logs for Discord API details.'}`,
       });
     }
 

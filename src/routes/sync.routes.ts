@@ -130,7 +130,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           const currentPrice = Number(item.currentPrice);
           const itemUrl = item.itemUrl || 'https://ebay.com';
 
-          const dmSent = await sendPriceAlertDM(
+          const dmResult = await sendPriceAlertDM(
             { discordId: userWithDiscord.discordId },
             {
               itemName: item.itemTitle || 'Unknown Item',
@@ -140,9 +140,9 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
             }
           );
 
-          if (!dmSent) {
+          if (!dmResult.success) {
             console.warn(
-              `[sync] Discord DM failed for user ${userId}, item ${item.id} (${item.itemTitle || 'Unknown Item'})`
+              `[sync] Discord DM failed for user ${userId}, item ${item.id} (${item.itemTitle || 'Unknown Item'}): ${dmResult.error || 'Unknown error'}`
             );
           }
         }

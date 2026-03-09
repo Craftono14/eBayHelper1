@@ -8,6 +8,7 @@
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const dmChannelCache = new Map<string, string>();
 
 interface DiscordUser {
   discordId: string;
@@ -21,6 +22,41 @@ interface PriceAlertNotification {
   url: string;
 }
 
+export interface DiscordSendResult {
+  success: boolean;
+  error?: string;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildAuthHeaders(): Record<string, string> {
+  return {
+    Authorization: `Bot ${BOT_TOKEN}`,
+    'Content-Type': 'application/json',
+    'User-Agent': 'EbayHelperBot (https://ebayhelper1.onrender.com, 1.0)',
+  };
+}
+
+async function requestWithRateLimitRetry(url: string, init: RequestInit, retries = 2): Promise<Response> {
+  let attempt = 0;
+  while (true) {
+    const response = await fetch(url, init);
+
+    if (response.status !== 429 || attempt >= retries) {
+      return response;
+    }
+
+    const retryAfterHeader = response.headers.get('retry-after');
+    const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : 1;
+    const waitMs = Number.isFinite(retryAfterSeconds) ? Math.max(1000, retryAfterSeconds * 1000) : 1000;
+    console.warn(`[Discord] 429 rate limit hit. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
+    await sleep(waitMs);
+    attempt += 1;
+  }
+}
+
 /**
  * Send a price alert notification via Discord DM
  * @param user - User's Discord info (ID required)
@@ -29,62 +65,77 @@ interface PriceAlertNotification {
 export async function sendPriceAlertDM(
   user: DiscordUser,
   alert: PriceAlertNotification
-): Promise<boolean> {
+): Promise<DiscordSendResult> {
   if (!user.discordId) {
     console.warn('Cannot send Discord DM: No Discord ID provided');
-    return false;
+    return { success: false, error: 'No Discord ID provided' };
   }
 
   if (!BOT_TOKEN) {
     console.warn('Cannot send Discord DM: DISCORD_BOT_TOKEN not configured');
-    return false;
+    return { success: false, error: 'DISCORD_BOT_TOKEN not configured' };
   }
 
   try {
-    // Step 1: Create a DM channel with the user
-    const channelResponse = await fetch(`${DISCORD_API_BASE}/users/@me/channels`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bot ${BOT_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        recipient_id: user.discordId
-      })
-    });
+    // Step 1: Get or create DM channel with the user
+    let channelId = dmChannelCache.get(user.discordId);
+    if (!channelId) {
+      const channelResponse = await requestWithRateLimitRetry(`${DISCORD_API_BASE}/users/@me/channels`, {
+        method: 'POST',
+        headers: buildAuthHeaders(),
+        body: JSON.stringify({
+          recipient_id: user.discordId,
+        }),
+      });
 
-    if (!channelResponse.ok) {
-      console.error('Failed to create DM channel:', await channelResponse.text());
-      return false;
+      if (!channelResponse.ok) {
+        const errorText = await channelResponse.text();
+        if (errorText.includes('Error 1015')) {
+          console.error('[Discord] Cloudflare 1015 rate limit. Your host IP is temporarily blocked by discord.com.');
+          return { success: false, error: 'Cloudflare 1015: host IP temporarily rate-limited by Discord' };
+        }
+
+        console.error('Failed to create DM channel:', errorText);
+        return { success: false, error: `Failed to create DM channel (${channelResponse.status})` };
+      }
+
+      const channel = (await channelResponse.json()) as { id: string };
+      channelId = channel.id;
+      dmChannelCache.set(user.discordId, channelId);
     }
-
-    const channel = await channelResponse.json() as { id: string };
-    const channelId = channel.id;
 
     // Step 2: Send the price alert message to the DM channel
     const messageContent = formatPriceAlertMessage(alert);
-    const messageResponse = await fetch(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
+    const messageResponse = await requestWithRateLimitRetry(`${DISCORD_API_BASE}/channels/${channelId}/messages`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bot ${BOT_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
+      headers: buildAuthHeaders(),
       body: JSON.stringify({
         content: messageContent,
-        embeds: [createPriceAlertEmbed(alert)]
-      })
+        embeds: [createPriceAlertEmbed(alert)],
+      }),
     });
 
     if (!messageResponse.ok) {
-      console.error('Failed to send DM message:', await messageResponse.text());
-      return false;
+      const errorText = await messageResponse.text();
+      if (errorText.includes('Error 1015')) {
+        console.error('[Discord] Cloudflare 1015 rate limit while sending message.');
+        return { success: false, error: 'Cloudflare 1015: host IP temporarily rate-limited by Discord' };
+      }
+
+      // If cached channel becomes invalid, remove and allow recreation next attempt.
+      if (messageResponse.status === 404 || messageResponse.status === 403) {
+        dmChannelCache.delete(user.discordId);
+      }
+
+      console.error('Failed to send DM message:', errorText);
+      return { success: false, error: `Failed to send DM message (${messageResponse.status})` };
     }
 
     console.log(`[Discord] Price alert sent to user ${user.discordId} for item: ${alert.itemName}`);
-    return true;
+    return { success: true };
   } catch (error) {
     console.error('[Discord] Error sending price alert notification:', error);
-    return false;
+    return { success: false, error: 'Unexpected error while sending Discord DM' };
   }
 }
 
@@ -145,13 +196,15 @@ export async function testDiscordConnection(): Promise<boolean> {
     return true; // Not an error, just not configured
   }
 
-  return await sendPriceAlertDM(
+  const result = await sendPriceAlertDM(
     { discordId: adminId },
     {
       itemName: '[TEST] eBay Helper Price Alert',
       currentPrice: 25.99,
       targetPrice: 29.99,
-      url: 'https://example.com'
+      url: 'https://example.com',
     }
   );
+
+  return result.success;
 }
