@@ -339,7 +339,7 @@ export const SearchResults: React.FC = () => {
         setSearchQuery(search.searchKeywords);
         
         // Map the sort preference to Browse API format
-        const sortValue = mapSortToBrowseAPI(search.sortBy, search.sortOrder);
+        const sortValue = mapSortToBrowseAPI(search.sortBy || null, search.sortOrder);
         setSortParam(sortValue);
         
         // Build filter string
@@ -382,35 +382,59 @@ export const SearchResults: React.FC = () => {
         setLoading(true);
         setError('');
 
-        // Build URL with sort, filter, and category parameters
-        let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${currentOffset}`;
-        if (sortParam) {
-          url += `&sort=${encodeURIComponent(sortParam)}`;
-        }
-        if (filterParam) {
-          url += `&filter=${encodeURIComponent(filterParam)}`;
-        }
-        if (categoryIds) {
-          url += `&category_ids=${encodeURIComponent(categoryIds)}`;
-        }
+        // Check if we have multiple categories
+        const categories = categoryIds ? categoryIds.split(',').map(c => c.trim()).filter(Boolean) : [];
+        
+        if (categories.length > 1) {
+          // Multi-category search: use the performMultiCategorySearch function
+          const result = await performMultiCategorySearch(
+            categories,
+            searchQuery,
+            sortParam,
+            filterParam,
+            limit,
+            currentOffset
+          );
+          
+          console.log('[SearchResults] Multi-category response:', {
+            itemCount: result.items.length,
+            total: result.total,
+            categoryCount: categories.length,
+          });
+          
+          setItems(result.items);
+          setTotal(result.total);
+        } else {
+          // Single or no category: standard search
+          let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${currentOffset}`;
+          if (sortParam) {
+            url += `&sort=${encodeURIComponent(sortParam)}`;
+          }
+          if (filterParam) {
+            url += `&filter=${encodeURIComponent(filterParam)}`;
+          }
+          if (categoryIds) {
+            url += `&category_ids=${encodeURIComponent(categoryIds)}`;
+          }
 
-        const response = await fetch(url);
+          const response = await fetch(url);
 
-        if (!response.ok) throw new Error('Failed to fetch items');
+          if (!response.ok) throw new Error('Failed to fetch items');
 
-        const data: SearchResponse = await response.json();
-        console.log('[SearchResults] Response received:', {
-          itemCount: data.items?.length,
-          total: data.total,
-          offset: data.offset,
-          limit: data.limit,
-          appliedSort: sortParam,
-          appliedFilter: filterParam,
-          appliedCategories: categoryIds,
-        });
-        console.log('[SearchResults] Items received:', data.items);
-        setItems(data.items || []);
-        setTotal(data.total || 0);
+          const data: SearchResponse = await response.json();
+          console.log('[SearchResults] Response received:', {
+            itemCount: data.items?.length,
+            total: data.total,
+            offset: data.offset,
+            limit: data.limit,
+            appliedSort: sortParam,
+            appliedFilter: filterParam,
+            appliedCategories: categoryIds,
+          });
+          console.log('[SearchResults] Items received:', data.items);
+          setItems(data.items || []);
+          setTotal(data.total || 0);
+        }
       } catch (err) {
         console.error('[SearchResults] Error fetching items:', err);
         setError(err instanceof Error ? err.message : 'Failed to load search results');
@@ -421,6 +445,110 @@ export const SearchResults: React.FC = () => {
 
     fetchItems();
   }, [searchQuery, currentOffset, limit, sortParam, filterParam, categoryIds]);
+
+  // Perform multi-category search and combine results
+  const performMultiCategorySearch = async (
+    categories: string[],
+    searchQuery: string,
+    sortParam: string,
+    filterParam: string,
+    limit: number,
+    offset: number
+  ): Promise<{ items: ItemSummary[]; total: number }> => {
+    // Perform parallel searches for each category
+    const searchPromises = categories.map(async (categoryId) => {
+      let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${offset}`;
+      if (sortParam) {
+        url += `&sort=${encodeURIComponent(sortParam)}`;
+      }
+      if (filterParam) {
+        url += `&filter=${encodeURIComponent(filterParam)}`;
+      }
+      url += `&category_ids=${encodeURIComponent(categoryId)}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to search category ${categoryId}`);
+      }
+      
+      const data: SearchResponse = await response.json();
+      return {
+        categoryId,
+        items: data.items || [],
+        total: data.total || 0,
+      };
+    });
+    
+    const results = await Promise.all(searchPromises);
+    
+    // Deduplicate items by itemId
+    const seenIds = new Set<string>();
+    let combinedItems: ItemSummary[] = [];
+    
+    // Check if using Best Match sort (no sort param or default)
+    const isBestMatch = !sortParam || sortParam === '';
+    
+    if (isBestMatch) {
+      // Mix results proportionally for Best Match
+      const totalResults = results.reduce((sum, r) => sum + r.total, 0);
+      
+      // Calculate how many items to take from each category result
+      const itemQueues = results.map(r => ({
+        items: [...r.items],
+        weight: r.total / totalResults,
+        nextInsertAt: 0,
+      }));
+      
+      let position = 0;
+      while (itemQueues.some(q => q.items.length > 0)) {
+        // Find which queue should provide the next item
+        for (const queue of itemQueues) {
+          if (queue.items.length > 0 && position >= queue.nextInsertAt) {
+            const item = queue.items.shift()!;
+            if (!seenIds.has(item.itemId)) {
+              seenIds.add(item.itemId);
+              combinedItems.push(item);
+            }
+            // Calculate next insert position based on weight
+            queue.nextInsertAt = position + Math.ceil(1 / queue.weight);
+          }
+        }
+        position++;
+        
+        // Safety check to prevent infinite loops
+        if (position > 1000) break;
+      }
+    } else {
+      // For other sorts, combine all results then re-sort
+      const allItems: ItemSummary[] = [];
+      for (const result of results) {
+        for (const item of result.items) {
+          if (!seenIds.has(item.itemId)) {
+            seenIds.add(item.itemId);
+            allItems.push(item);
+          }
+        }
+      }
+      
+      // Re-sort combined results based on sort parameter
+      if (sortParam === 'price' || sortParam === '-price') {
+        allItems.sort((a, b) => {
+          const priceA = parseFloat(a.price?.value || a.currentBidPrice?.value || '0');
+          const priceB = parseFloat(b.price?.value || b.currentBidPrice?.value || '0');
+          return sortParam === 'price' ? priceA - priceB : priceB - priceA;
+        });
+      }
+      
+      combinedItems = allItems;
+    }
+    
+    const totalCount = results.reduce((sum, r) => sum + r.total, 0);
+    
+    return {
+      items: combinedItems,
+      total: totalCount,
+    };
+  };
 
   const getShippingCost = (item: ItemSummary): string => {
     try {

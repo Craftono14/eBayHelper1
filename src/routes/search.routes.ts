@@ -98,9 +98,16 @@ router.post('/saved', async (req: Request, res: Response): Promise<void> => {
       maxPrice,
       condition,
       buyingFormat,
+      categories,
+      itemLocation,
+      currency,
+      sortBy,
+      sortOrder,
       freeShipping,
       freeReturns,
+      returnsAccepted,
       authorizedSeller,
+      searchInDescription,
     } = req.body;
 
     if (!searchKeywords) {
@@ -117,9 +124,16 @@ router.post('/saved', async (req: Request, res: Response): Promise<void> => {
         maxPrice: maxPrice ? parseFloat(maxPrice) : null,
         condition: condition || null,
         buyingFormat: buyingFormat || null,
+        categories: categories ? JSON.stringify(categories) : null,
+        itemLocation: itemLocation || null,
+        currency: currency || null,
+        sortBy: sortBy || null,
+        sortOrder: sortOrder || null,
         freeShipping: freeShipping || false,
         freeReturns: freeReturns || false,
+        returnsAccepted: returnsAccepted || false,
         authorizedSeller: authorizedSeller || false,
+        searchInDescription: searchInDescription || false,
         isActive: true,
       },
     });
@@ -131,6 +145,75 @@ router.post('/saved', async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Failed to create saved search:', error);
     res.status(500).json({ error: 'Failed to create saved search' });
+  }
+});
+
+/**
+ * PUT /api/search/saved/:id
+ * Update existing saved search
+ */
+router.put('/saved/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).userId;
+    const searchId = parseInt(req.params.id);
+    const {
+      name,
+      searchKeywords,
+      minPrice,
+      maxPrice,
+      condition,
+      buyingFormat,
+      categories,
+      itemLocation,
+      currency,
+      sortBy,
+      sortOrder,
+      freeShipping,
+      freeReturns,
+      returnsAccepted,
+      authorizedSeller,
+      searchInDescription,
+    } = req.body;
+
+    // Verify ownership
+    const search = await prisma.savedSearch.findUnique({
+      where: { id: searchId },
+    });
+
+    if (!search || search.userId !== userId) {
+      res.status(404).json({ error: 'Search not found' });
+      return;
+    }
+
+    const updatedSearch = await prisma.savedSearch.update({
+      where: { id: searchId },
+      data: {
+        name: name || searchKeywords,
+        searchKeywords,
+        minPrice: minPrice ? parseFloat(minPrice) : null,
+        maxPrice: maxPrice ? parseFloat(maxPrice) : null,
+        condition: condition || null,
+        buyingFormat: buyingFormat || null,
+        categories: categories ? JSON.stringify(categories) : null,
+        itemLocation: itemLocation || null,
+        currency: currency || null,
+        sortBy: sortBy || null,
+        sortOrder: sortOrder || null,
+        freeShipping: freeShipping || false,
+        freeReturns: freeReturns || false,
+        returnsAccepted: returnsAccepted || false,
+        authorizedSeller: authorizedSeller || false,
+        searchInDescription: searchInDescription || false,
+      },
+    });
+
+    res.json({
+      message: 'Saved search updated',
+      search: updatedSearch,
+    });
+  } catch (error) {
+    console.error('Failed to update saved search:', error);
+    res.status(500).json({ error: 'Failed to update saved search' });
   }
 });
 

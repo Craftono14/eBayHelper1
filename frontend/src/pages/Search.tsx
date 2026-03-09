@@ -471,6 +471,97 @@ export const Search: React.FC = () => {
     };
   };
 
+  const handleSaveSearch = async () => {
+    if (!searchName.trim()) {
+      setError('Please enter a search name');
+      return;
+    }
+
+    if (!searchKeywords.trim()) {
+      setError('Please enter search keywords');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      // Build filter object (same as in handleSearch)
+      const filters = {
+        searchKeywords,
+        categories: selectedCategories,
+        condition: selectedCondition || null,
+        itemLocation: itemLocation !== 'Default' ? itemLocation : null,
+        buyingFormat: listingType,
+        minPrice: minPrice ? parseFloat(minPrice) : null,
+        maxPrice: maxPrice ? parseFloat(maxPrice) : null,
+        returnsAccepted: returns === 'accepted',
+        freeReturns: returns === 'free',
+        freeShipping,
+        searchInDescription,
+        currency,
+        sortBy,
+        sortOrder: sortBy === 'PricePlusShippingHighest' ? 'Descending' : 'Ascending',
+      };
+
+      // Check if a search with this name already exists
+      const listResponse = await fetch('/api/search/saved', {
+        headers: {
+          'x-user-id': token || '0',
+        },
+      });
+
+      if (!listResponse.ok) {
+        throw new Error('Failed to check existing searches');
+      }
+
+      const { searches } = await listResponse.json();
+      const existingSearch = searches.find((s: any) => s.name === searchName);
+
+      let response;
+      if (existingSearch) {
+        // Update existing search
+        response = await fetch(`/api/search/saved/${existingSearch.id}`, {
+          method: 'PUT',
+          headers: {
+            'x-user-id': token || '0',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: searchName,
+            ...filters,
+          }),
+        });
+      } else {
+        // Create new search
+        response = await fetch('/api/search/saved', {
+          method: 'POST',
+          headers: {
+            'x-user-id': token || '0',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: searchName,
+            ...filters,
+          }),
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save search');
+      }
+
+      await response.json();
+      alert(existingSearch ? 'Search updated successfully!' : 'Search saved successfully!');
+    } catch (err) {
+      console.error('[Search] Save Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save search');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSearch = async () => {
     if (!searchKeywords.trim()) {
       setError('Please enter search keywords');
@@ -556,27 +647,6 @@ export const Search: React.FC = () => {
         const data: SearchResponse = await response.json();
         setItems(data.items || []);
         setTotal(data.total || 0);
-      }
-
-      if (searchName) {
-        const response = await fetch('/api/searches', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: searchName,
-            ...filters,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create search');
-        }
-
-        await response.json();
       }
     } catch (err) {
       console.error('[Search] Error:', err);
@@ -828,7 +898,7 @@ export const Search: React.FC = () => {
           {/* Search Name (for saving) */}
           <div>
             <label className="block text-sm font-semibold mb-2">
-              Save as Search (Optional)
+              Search Name (for saving)
             </label>
             <input
               type="text"
@@ -838,24 +908,28 @@ export const Search: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Leave blank to search without saving
+              Enter a name to save this search for later
             </p>
           </div>
 
-          {/* Search Button */}
-          <button
-            onClick={handleSearch}
-            disabled={loading}
-            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-semibold"
-          >
-            {loading ? 'Searching...' : 'Search eBay'}
-          </button>
-
-          {selectedCategories.length > 1 && (
-            <p className="text-xs text-gray-500">
-              Multi-category live results are not enabled yet. For now, this search opens the results page.
-            </p>
-          )}
+          {/* Search Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleSearch}
+              disabled={loading}
+              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-semibold"
+            >
+              {loading ? 'Searching...' : 'Search eBay'}
+            </button>
+            
+            <button
+              onClick={handleSaveSearch}
+              disabled={loading || !searchName.trim()}
+              className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-semibold"
+            >
+              {loading ? 'Saving...' : 'Save Search'}
+            </button>
+          </div>
 
           <div className="bg-gray-100 border border-gray-200 rounded-lg p-3 text-xs text-gray-700">
             <p className="font-semibold mb-1">Debug</p>
