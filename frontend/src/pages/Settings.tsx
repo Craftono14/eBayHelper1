@@ -108,6 +108,33 @@ export function Settings() {
     }
   };
 
+  const handleTestDiscordDM = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('/api/users/discord-settings/test', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        alert('Test Discord DM sent. Check your Discord inbox.');
+      } else {
+        alert(data?.error || 'Failed to send test Discord DM. Check server logs.');
+      }
+    } catch (error) {
+      console.error('Error testing Discord DM:', error);
+      alert('Failed to send test Discord DM. Check server logs.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">User Settings</h1>
@@ -221,6 +248,18 @@ export function Settings() {
                 }`}
               >
                 Clear Settings
+              </button>
+
+              <button
+                onClick={handleTestDiscordDM}
+                disabled={loading || !discordSettings.discordId}
+                className={`px-6 py-2 rounded-md font-medium text-white ${
+                  loading || !discordSettings.discordId
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+              >
+                Send Test DM
               </button>
             </div>
 

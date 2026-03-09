@@ -129,8 +129,8 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
         if (userWithDiscord?.discordId) {
           const currentPrice = Number(item.currentPrice);
           const itemUrl = item.itemUrl || 'https://ebay.com';
-          
-          await sendPriceAlertDM(
+
+          const dmSent = await sendPriceAlertDM(
             { discordId: userWithDiscord.discordId },
             {
               itemName: item.itemTitle || 'Unknown Item',
@@ -139,6 +139,12 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
               url: itemUrl,
             }
           );
+
+          if (!dmSent) {
+            console.warn(
+              `[sync] Discord DM failed for user ${userId}, item ${item.id} (${item.itemTitle || 'Unknown Item'})`
+            );
+          }
         }
 
         // Skip manually set alerts - user needs to manually remove/edit them

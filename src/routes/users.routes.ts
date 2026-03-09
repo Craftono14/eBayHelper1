@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
+import { sendPriceAlertDM } from '../services/discord-notification';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -93,6 +94,50 @@ router.delete('/discord-settings', requireAuth, async (req: AuthRequest, res): P
   } catch (error) {
     console.error('Error clearing Discord settings:', error);
     res.status(500).json({ error: 'Failed to clear Discord settings' });
+  }
+});
+
+// POST /api/users/discord-settings/test - Send a test Discord DM
+router.post('/discord-settings/test', requireAuth, async (req: AuthRequest, res): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        discordId: true,
+      },
+    });
+
+    if (!user?.discordId) {
+      return res.status(400).json({
+        error: 'Discord User ID is not configured. Save it in Discord Settings first.',
+      });
+    }
+
+    const sent = await sendPriceAlertDM(
+      { discordId: user.discordId },
+      {
+        itemName: '[TEST] eBay Helper Notification',
+        currentPrice: 19.99,
+        targetPrice: 24.99,
+        url: 'https://www.ebay.com',
+      }
+    );
+
+    if (!sent) {
+      return res.status(502).json({
+        error: 'Failed to send test Discord DM. Check server logs for Discord API error details.',
+      });
+    }
+
+    return res.json({ success: true, message: 'Test Discord DM sent successfully.' });
+  } catch (error) {
+    console.error('Error sending test Discord DM:', error);
+    return res.status(500).json({ error: 'Failed to send test Discord DM' });
   }
 });
 
