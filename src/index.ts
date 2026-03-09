@@ -33,6 +33,7 @@ const port: number = parseInt(process.env.PORT || '10000', 10);
 
 // Prisma will be initialized in startServer to avoid blocking
 let prisma: PrismaClient;
+let priceRouter: ReturnType<typeof createPriceMonitoringRouter> | null = null;
 
 // Middleware
 app.use(
@@ -162,6 +163,19 @@ app.use('/api/ebay/account-deletion', ebayAccountDeletionRoutes);
 // Sync routes
 app.use('/api/sync', syncRoutes);
 
+// Price monitoring routes (mounted here to preserve middleware order before 404 handler)
+app.use('/api/prices', requireAuth, (req: Request, res: Response, next: NextFunction): void => {
+  if (!priceRouter) {
+    res.status(503).json({
+      error: 'Service Unavailable',
+      message: 'Price monitoring routes are not initialized yet',
+    });
+    return;
+  }
+
+  priceRouter(req, res, next);
+});
+
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction): void => {
   console.error(err);
@@ -202,13 +216,13 @@ const startServer = async (): Promise<void> => {
     prisma = new PrismaClient();
     console.log('[STARTUP] Prisma Client initialized');
 
-    // Mount price monitoring routes (needs prisma to be initialized first)
+    // Initialize price monitoring router (mounted earlier in middleware chain)
     try {
       const accessToken = process.env.EBAY_ACCESS_TOKEN || '';
-      app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, accessToken));
-      console.log('[STARTUP] ✓ Price monitoring routes mounted at /api/prices');
+      priceRouter = createPriceMonitoringRouter(prisma, accessToken);
+      console.log('[STARTUP] ✓ Price monitoring router initialized');
     } catch (err) {
-      console.error('[STARTUP] ✗ Failed to mount price monitoring routes:', err instanceof Error ? err.message : String(err));
+      console.error('[STARTUP] ✗ Failed to initialize price monitoring router:', err instanceof Error ? err.message : String(err));
     }
 
     // Bind to port immediately - migrations should have already run via preDeployCommand
