@@ -16,6 +16,7 @@ import ebayWatchlistRoutes from './routes/ebay-watchlist.routes';
 import ebaySyncRoutes from './routes/ebay-sync.routes';
 import ebayAccountDeletionRoutes from './routes/ebay-account-deletion.routes';
 import syncRoutes from './routes/sync.routes';
+import usersRoutes from './routes/users.routes';
 import { createPriceMonitoringRouter } from './routes/prices.routes';
 import { requireAuth } from './middleware/auth.middleware';
 import { initializeWorkers, mountWorkerRoutes } from './workers/express-integration';
@@ -162,6 +163,9 @@ app.use('/api/ebay/account-deletion', ebayAccountDeletionRoutes);
 
 // Sync routes
 app.use('/api/sync', syncRoutes);
+
+// Users routes
+app.use('/api/users', usersRoutes);
 
 // Price monitoring routes (mounted here to preserve middleware order before 404 handler)
 app.use('/api/prices', requireAuth, (req: Request, res: Response, next: NextFunction): void => {

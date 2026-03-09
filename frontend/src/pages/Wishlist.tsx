@@ -282,6 +282,38 @@ export const Wishlist: React.FC = () => {
     }
   };
 
+  const handleRemoveAllAlerts = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to remove all price alerts? This action cannot be undone.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError('');
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/prices/all-alerts', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove all alerts');
+      }
+
+      const data = await response.json();
+      setNotificationMessage(`Removed ${data.count} price alerts`);
+      await fetchWishlist();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove all alerts');
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="text-center py-16">
@@ -306,6 +338,12 @@ export const Wishlist: React.FC = () => {
             className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {syncing ? 'Syncing...' : 'Sync from eBay'}
+          </button>
+          <button
+            onClick={handleRemoveAllAlerts}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition"
+          >
+            Remove All Alerts
           </button>
 
           {/* Filter Tabs */}

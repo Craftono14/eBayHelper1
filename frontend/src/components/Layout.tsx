@@ -47,7 +47,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <div className="flex items-center space-x-4">
             {user ? (
               <>
-                <span className="text-gray-700 font-medium">{user.email}</span>
+                <Link to="/settings" className="text-gray-700 font-medium hover:text-blue-600 transition-colors">
+                  {user.email}
+                </Link>
                 <button
                   onClick={handleAuthClick}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition"

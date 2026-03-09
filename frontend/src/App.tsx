@@ -11,6 +11,7 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { LinkEbay } from './pages/LinkEbay';
 import { Tests } from './pages/Tests';
+import { Settings } from './pages/Settings';
 import EbayCallback from './pages/EbayCallback';
 import './App.css';
 
@@ -31,6 +32,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/link-ebay" element={<LinkEbay />} />
             <Route path="/tests" element={<Tests />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/ebay-callback" element={<EbayCallback />} />
           </Routes>
         </Layout>

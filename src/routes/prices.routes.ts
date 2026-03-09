@@ -506,5 +506,45 @@ export function createPriceMonitoringRouter(
     }
   );
 
+  /**
+   * DELETE /api/prices/all-alerts
+   * Remove all price alerts for the user
+   */
+  router.delete(
+    '/all-alerts',
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+          res.status(401).json({ error: 'User not authenticated' });
+          return;
+        }
+
+        const result = await prisma.wishlistItem.updateMany({
+          where: {
+            userId,
+            targetPrice: { not: null },
+          },
+          data: {
+            targetPrice: null,
+            targetPriceSetManually: false,
+          },
+        });
+
+        res.json({
+          success: true,
+          message: `Removed ${result.count} price alerts`,
+          count: result.count,
+        });
+      } catch (error) {
+        console.error('[priceRoutes] Delete all alerts failed:', error);
+        res.status(500).json({
+          error: (error as Error).message,
+        });
+      }
+    }
+  );
+
   return router;
 }
