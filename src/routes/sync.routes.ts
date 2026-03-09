@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { ebaySyncService } from '../services/ebaySync.service';
+import { sendPriceAlertDM } from '../services/discord-notification';
 import { PrismaClient } from '@prisma/client';
 
 const router = Router();
@@ -99,6 +100,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       select: {
         id: true,
         itemTitle: true,
+        itemUrl: true,
         currentPrice: true,
         targetPrice: true,
         targetPriceSetManually: true,
@@ -113,7 +115,32 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
 
     // Process triggered alerts: keep manual alerts, reset auto alerts with percentage if set
     if (triggeredItems.length > 0) {
+      // Fetch user's Discord settings to send notifications
+      const userWithDiscord = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          discordId: true,
+          globalPriceDropPercentage: true,
+        },
+      });
+
       for (const item of triggeredItems) {
+        // Send Discord notification if user has Discord ID configured
+        if (userWithDiscord?.discordId) {
+          const currentPrice = Number(item.currentPrice);
+          const itemUrl = item.itemUrl || 'https://ebay.com';
+          
+          await sendPriceAlertDM(
+            { discordId: userWithDiscord.discordId },
+            {
+              itemName: item.itemTitle || 'Unknown Item',
+              currentPrice,
+              targetPrice: Number(item.targetPrice),
+              url: itemUrl,
+            }
+          );
+        }
+
         // Skip manually set alerts - user needs to manually remove/edit them
         if (item.targetPriceSetManually) {
           continue;

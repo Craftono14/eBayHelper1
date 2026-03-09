@@ -92,7 +92,7 @@ export async function sendPriceAlertDM(
  * Format the text content of the price alert message
  */
 function formatPriceAlertMessage(alert: PriceAlertNotification): string {
-  return `🔔 **Price Alert Triggered!**\n\n**${alert.itemName}**\nCurrent Price: $${alert.currentPrice.toFixed(2)}\nTarget Price: $${alert.targetPrice.toFixed(2)}`;
+  return `eBay Price Drop Notification: ${alert.itemName} has dropped to $${alert.currentPrice.toFixed(2)}. eBay Item Link: ${alert.url}`;
 }
 
 /**

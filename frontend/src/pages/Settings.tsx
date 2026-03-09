@@ -146,6 +146,17 @@ export function Settings() {
             The bot will send you direct messages on Discord when price alerts trigger. Just provide your Discord User ID below.
           </p>
 
+          <div className="mb-6">
+            <a
+              href="https://discord.gg/hQSjewfW4X"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition"
+            >
+              Join Discord Server
+            </a>
+          </div>
+
           <div className="space-y-4">
 
             {/* Discord User ID */}
