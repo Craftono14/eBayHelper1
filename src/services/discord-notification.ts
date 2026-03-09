@@ -9,6 +9,8 @@
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const dmChannelCache = new Map<string, string>();
+const DISCORD_HTTP_TIMEOUT_MS = Number(process.env.DISCORD_HTTP_TIMEOUT_MS || '10000');
+const DISCORD_MAX_RETRY_WAIT_MS = Number(process.env.DISCORD_MAX_RETRY_WAIT_MS || '10000');
 
 interface DiscordUser {
   discordId: string;
@@ -39,18 +41,54 @@ function buildAuthHeaders(): Record<string, string> {
   };
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DISCORD_HTTP_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseRetryAfterMs(response: Response, responseText: string): number {
+  try {
+    const parsed = JSON.parse(responseText) as { retry_after?: number };
+    if (typeof parsed.retry_after === 'number' && Number.isFinite(parsed.retry_after)) {
+      return Math.max(1000, Math.ceil(parsed.retry_after * 1000));
+    }
+  } catch {
+    // Ignore JSON parse errors and fall back to headers.
+  }
+
+  const retryAfterHeader = response.headers.get('retry-after');
+  const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : 1;
+  return Number.isFinite(retryAfter) ? Math.max(1000, Math.ceil(retryAfter * 1000)) : 1000;
+}
+
 async function requestWithRateLimitRetry(url: string, init: RequestInit, retries = 2): Promise<Response> {
   let attempt = 0;
   while (true) {
-    const response = await fetch(url, init);
+    const response = await fetchWithTimeout(url, init);
 
     if (response.status !== 429 || attempt >= retries) {
       return response;
     }
 
-    const retryAfterHeader = response.headers.get('retry-after');
-    const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : 1;
-    const waitMs = Number.isFinite(retryAfterSeconds) ? Math.max(1000, retryAfterSeconds * 1000) : 1000;
+    const responseText = await response.text();
+    const waitMs = parseRetryAfterMs(response, responseText);
+
+    if (waitMs > DISCORD_MAX_RETRY_WAIT_MS) {
+      console.warn(
+        `[Discord] 429 rate limit requested ${waitMs}ms wait; exceeds cap ${DISCORD_MAX_RETRY_WAIT_MS}ms. Failing fast.`
+      );
+      return new Response(responseText, {
+        status: 429,
+        statusText: 'Rate limited (wait too long)',
+        headers: response.headers,
+      });
+    }
+
     console.warn(`[Discord] 429 rate limit hit. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
     await sleep(waitMs);
     attempt += 1;
@@ -95,6 +133,10 @@ export async function sendPriceAlertDM(
           return { success: false, error: 'Cloudflare 1015: host IP temporarily rate-limited by Discord' };
         }
 
+        if (channelResponse.status === 429) {
+          return { success: false, error: 'Discord API rate-limited this server. Please wait a few minutes and retry.' };
+        }
+
         console.error('Failed to create DM channel:', errorText);
         return { success: false, error: `Failed to create DM channel (${channelResponse.status})` };
       }
@@ -120,6 +162,10 @@ export async function sendPriceAlertDM(
       if (errorText.includes('Error 1015')) {
         console.error('[Discord] Cloudflare 1015 rate limit while sending message.');
         return { success: false, error: 'Cloudflare 1015: host IP temporarily rate-limited by Discord' };
+      }
+
+      if (messageResponse.status === 429) {
+        return { success: false, error: 'Discord API rate-limited this server. Please wait a few minutes and retry.' };
       }
 
       // If cached channel becomes invalid, remove and allow recreation next attempt.
