@@ -52,19 +52,33 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
         currentPrice: { not: null },
       },
       select: {
+        id: true,
         itemTitle: true,
         currentPrice: true,
         targetPrice: true,
       },
     });
 
-    const alertsTriggered = recentlySyncedItems
-      .filter((item) => {
-        const currentPrice = Number(item.currentPrice);
-        const targetPrice = Number(item.targetPrice);
-        return Number.isFinite(currentPrice) && Number.isFinite(targetPrice) && currentPrice <= targetPrice;
-      })
-      .map((item) => item.itemTitle || 'Untitled Item');
+    const triggeredItems = recentlySyncedItems.filter((item) => {
+      const currentPrice = Number(item.currentPrice);
+      const targetPrice = Number(item.targetPrice);
+      return Number.isFinite(currentPrice) && Number.isFinite(targetPrice) && currentPrice <= targetPrice;
+    });
+
+    // Clear the alerts for triggered items so user is only notified once
+    if (triggeredItems.length > 0) {
+      await prisma.wishlistItem.updateMany({
+        where: {
+          id: { in: triggeredItems.map(item => item.id) },
+        },
+        data: {
+          targetPrice: null,
+        },
+      });
+      console.log(`[sync] Cleared ${triggeredItems.length} triggered price alerts`);
+    }
+
+    const alertsTriggered = triggeredItems.map((item) => item.itemTitle || 'Untitled Item');
 
     const totalCount = searchesCount + watchlistCount;
 

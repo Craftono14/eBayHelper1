@@ -174,6 +174,29 @@ export const Wishlist: React.FC = () => {
     }
   };
 
+  const handleRemovePriceAlert = async (item: WishlistItem) => {
+    try {
+      setError('');
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/prices/items/${item.id}/target`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove price alert');
+      }
+
+      setNotificationMessage('Price alert removed');
+      await fetchWishlist();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove price alert');
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="text-center py-16">
@@ -385,12 +408,22 @@ export const Wishlist: React.FC = () => {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => handlePriceDropNotification(item)}
-                      className="bg-indigo-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-indigo-700 transition text-sm whitespace-nowrap"
-                    >
-                      {item.targetPrice ? 'Edit Price Alert' : 'Set Price Alert'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handlePriceDropNotification(item)}
+                        className="bg-indigo-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-indigo-700 transition text-sm whitespace-nowrap"
+                      >
+                        {item.targetPrice ? 'Edit Price Alert' : 'Set Price Alert'}
+                      </button>
+                      {item.targetPrice && (
+                        <button
+                          onClick={() => handleRemovePriceAlert(item)}
+                          className="bg-orange-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-orange-700 transition text-sm whitespace-nowrap"
+                        >
+                          Remove Alert
+                        </button>
+                      )}
+                    </>
                   )}
                   <button
                     onClick={() => handleDelete(item)}

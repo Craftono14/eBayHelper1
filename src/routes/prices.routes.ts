@@ -363,5 +363,34 @@ export function createPriceMonitoringRouter(
     }
   );
 
+  /**
+   * DELETE /api/prices/items/:wishlistItemId/target
+   * Remove price alert for an item
+   */
+  router.delete(
+    '/items/:wishlistItemId/target',
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const wishlistItemId = parseInt(req.params.wishlistItemId);
+
+        const item = await prisma.wishlistItem.update({
+          where: { id: wishlistItemId },
+          data: { targetPrice: null },
+        });
+
+        res.json({
+          success: true,
+          wishlistItemId,
+          message: 'Price alert removed',
+        });
+      } catch (error) {
+        console.error('[priceRoutes] Target price removal failed:', error);
+        res.status(500).json({
+          error: (error as Error).message,
+        });
+      }
+    }
+  );
+
   return router;
 }
