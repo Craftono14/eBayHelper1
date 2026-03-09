@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 
 interface DiscordSettings {
-  discordWebhookUrl: string;
   discordId: string;
   username: string;
 }
@@ -9,7 +8,6 @@ interface DiscordSettings {
 export function Settings() {
   const [activeTab, setActiveTab] = useState<'discord' | 'account'>('discord');
   const [discordSettings, setDiscordSettings] = useState<DiscordSettings>({
-    discordWebhookUrl: '',
     discordId: '',
     username: ''
   });
@@ -34,7 +32,6 @@ export function Settings() {
       if (response.ok) {
         const data = await response.json();
         setDiscordSettings({
-          discordWebhookUrl: data.discordWebhookUrl || '',
           discordId: data.discordId || '',
           username: data.username || ''
         });
@@ -95,7 +92,6 @@ export function Settings() {
 
       if (response.ok) {
         setDiscordSettings({
-          discordWebhookUrl: '',
           discordId: '',
           username: ''
         });
@@ -145,35 +141,17 @@ export function Settings() {
       {/* Discord Settings Tab */}
       {activeTab === 'discord' && (
         <div className="max-w-2xl">
-          <h2 className="text-2xl font-bold mb-4">Discord Notification Settings</h2>
+          <h2 className="text-2xl font-bold mb-4">Discord Direct Message Settings</h2>
           <p className="text-gray-600 mb-6">
-            Configure Discord notifications to receive price alerts when items in your watchlist drop below your target price.
+            The bot will send you direct messages on Discord when price alerts trigger. Just provide your Discord User ID below.
           </p>
 
           <div className="space-y-4">
-            {/* Discord Webhook URL */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Discord Webhook URL
-              </label>
-              <input
-                type="text"
-                value={discordSettings.discordWebhookUrl}
-                onChange={(e) =>
-                  setDiscordSettings({ ...discordSettings, discordWebhookUrl: e.target.value })
-                }
-                placeholder="https://discord.com/api/webhooks/..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Create a webhook in your Discord server settings → Integrations → Webhooks
-              </p>
-            </div>
 
             {/* Discord User ID */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Discord User ID (Optional)
+                Discord User ID *
               </label>
               <input
                 type="text"
@@ -185,7 +163,7 @@ export function Settings() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-sm text-gray-500 mt-1">
-                Your Discord user ID for mentions (enable Developer Mode in Discord to copy ID)
+                Enable Developer Mode in Discord (User Settings → App Settings → Advanced → Developer Mode) and right-click your username to copy ID
               </p>
             </div>
 
@@ -204,7 +182,7 @@ export function Settings() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-sm text-gray-500 mt-1">
-                Your Discord username for display purposes
+                Your current Discord username (for record-keeping)
               </p>
             </div>
 
@@ -212,9 +190,9 @@ export function Settings() {
             <div className="flex space-x-3 pt-4">
               <button
                 onClick={handleSaveDiscordSettings}
-                disabled={loading || !discordSettings.discordWebhookUrl}
+                disabled={loading || !discordSettings.discordId}
                 className={`px-6 py-2 rounded-md font-medium text-white ${
-                  loading || !discordSettings.discordWebhookUrl
+                  loading || !discordSettings.discordId
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
@@ -224,9 +202,9 @@ export function Settings() {
 
               <button
                 onClick={handleClearDiscordSettings}
-                disabled={loading || !discordSettings.discordWebhookUrl}
+                disabled={loading || !discordSettings.discordId}
                 className={`px-6 py-2 rounded-md font-medium ${
-                  loading || !discordSettings.discordWebhookUrl
+                  loading || !discordSettings.discordId
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : 'bg-red-600 text-white hover:bg-red-700'
                 }`}
@@ -245,12 +223,13 @@ export function Settings() {
 
           {/* Info Box */}
           <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-md">
-            <h3 className="font-semibold text-blue-900 mb-2">How Discord Notifications Work</h3>
+            <h3 className="font-semibold text-blue-900 mb-2">How Discord Direct Messages Work</h3>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-              <li>Price alerts are sent when an item's current price drops below your target price</li>
+              <li>Our bot will send you a private message when a price alert triggers</li>
               <li>Notifications are sent during watchlist sync operations</li>
-              <li>Webhook URL is required for notifications to work</li>
-              <li>User ID and username are optional but enhance notification display</li>
+              <li>Discord User ID is required for the bot to send you messages</li>
+              <li>Your username is optional and only stored for record-keeping</li>
+              <li>Make sure your Discord privacy settings allow DMs from the bot</li>
             </ul>
           </div>
         </div>
