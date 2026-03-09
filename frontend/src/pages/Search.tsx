@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 interface ItemSummary {
@@ -59,6 +60,7 @@ interface CategoryConfig {
 
 export const Search: React.FC = () => {
   const { isLoggedIn, user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   // Form state
   const [searchKeywords, setSearchKeywords] = useState('');
@@ -109,6 +111,7 @@ export const Search: React.FC = () => {
   const listingTypes = categoryConfig.listingTypes;
   const currencies = categoryConfig.currencies;
   const sortOptions = categoryConfig.sortOptions;
+  const token = localStorage.getItem('token');
 
   const isPricePlusShippingSort = (sortValue: string): boolean => {
     return (
@@ -134,6 +137,75 @@ export const Search: React.FC = () => {
 
     loadCategoryConfig();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      return;
+    }
+
+    const editSearchId = searchParams.get('editSearchId');
+    if (!editSearchId) {
+      return;
+    }
+
+    const prefillSavedSearch = async () => {
+      try {
+        setError('');
+        const response = await fetch(`/api/searches/${editSearchId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to load saved search for editing');
+        }
+
+        const savedSearch = await response.json();
+
+        setSearchName(savedSearch.name || '');
+        setSearchKeywords(savedSearch.searchKeywords || '');
+        setSelectedCondition(savedSearch.condition || '');
+        setItemLocation(savedSearch.itemLocation || 'Default');
+        setListingType(savedSearch.buyingFormat || 'Both');
+        setMinPrice(savedSearch.minPrice ? String(savedSearch.minPrice) : '');
+        setMaxPrice(savedSearch.maxPrice ? String(savedSearch.maxPrice) : '');
+        setCurrency(savedSearch.currency || 'USD');
+        setSortBy(savedSearch.sortBy || 'BestMatch');
+        setFreeShipping(Boolean(savedSearch.freeShipping));
+        setSearchInDescription(Boolean(savedSearch.searchInDescription));
+
+        if (savedSearch.freeReturns) {
+          setReturns('free');
+        } else if (savedSearch.returnsAccepted) {
+          setReturns('accepted');
+        } else {
+          setReturns('ignore');
+        }
+
+        if (savedSearch.categories) {
+          try {
+            const parsedCategories = JSON.parse(savedSearch.categories);
+            if (Array.isArray(parsedCategories)) {
+              setSelectedCategories(parsedCategories.map((id: unknown) => String(id)));
+            } else {
+              setSelectedCategories([]);
+            }
+          } catch {
+            setSelectedCategories([]);
+          }
+        } else {
+          setSelectedCategories([]);
+        }
+      } catch (prefillError) {
+        console.error('[Search] Failed to prefill saved search:', prefillError);
+        setError(prefillError instanceof Error ? prefillError.message : 'Failed to load saved search for editing');
+      }
+    };
+
+    prefillSavedSearch();
+  }, [isLoggedIn, searchParams, token]);
 
   const toggleCategorySelection = (categoryId: string) => {
     setSelectedCategories((prev) =>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 interface SavedSearch {
@@ -14,6 +15,7 @@ interface SavedSearch {
 
 export const SavedSearches: React.FC = () => {
   const { isLoggedIn } = useAuth();
+  const navigate = useNavigate();
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -265,7 +267,7 @@ export const SavedSearches: React.FC = () => {
                 ) : (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {/* TODO: Implement edit functionality */}}
+                      onClick={() => navigate(`/search?editSearchId=${search.id}`)}
                       className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition"
                     >
                       Edit
