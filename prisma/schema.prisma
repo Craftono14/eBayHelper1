@@ -157,7 +157,7 @@ model WishlistItem {
   // Price tracking
   currentPrice            Decimal?       @db.Decimal(10, 2)
   shippingCost            Decimal?       @db.Decimal(10, 2)
-  targetPrice             Decimal        @db.Decimal(10, 2) // Price user wants to buy at
+  targetPrice             Decimal?       @db.Decimal(10, 2) // Optional alert threshold; null means no price alert set
   lowestPriceRecorded     Decimal?       @db.Decimal(10, 2)
   highestPriceRecorded    Decimal?       @db.Decimal(10, 2)
   

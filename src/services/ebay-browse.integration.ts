@@ -153,7 +153,7 @@ export async function findItemsInBudget(
           itemTitle: item.title,
           itemUrl: item.itemHref,
           currentPrice: itemPrice,
-          targetPrice: maxPrice,
+          targetPrice: null,
           lowestPriceRecorded: itemPrice,
           highestPriceRecorded: itemPrice,
           seller: item.seller.username,
