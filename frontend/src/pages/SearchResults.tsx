@@ -508,8 +508,10 @@ export const SearchResults: React.FC = () => {
             {items.filter(item => item?.itemId).map((item) => {
               try {
                 const isAuction = item.buyingOptions?.includes('AUCTION');
-                const displayPriceValue = isAuction && item.currentBidPrice?.value
-                  ? item.currentBidPrice.value
+                // For auction items: show current bid if available, otherwise show price (BIN or starting bid)
+                // For non-auction items: show price (fixed price)
+                const displayPriceValue = isAuction
+                  ? (item.currentBidPrice?.value || item.price?.value)
                   : item.price?.value;
                 const price = displayPriceValue ? parseFloat(displayPriceValue).toFixed(2) : 'N/A';
                 const currency = item.price?.currency || 'USD';

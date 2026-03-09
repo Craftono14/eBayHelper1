@@ -67,7 +67,6 @@ export const Search: React.FC = () => {
   const [searchKeywords, setSearchKeywords] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedCondition, setSelectedCondition] = useState<string>('');
-  const [minFeedback, setMinFeedback] = useState('');
   const [itemLocation, setItemLocation] = useState('Default');
   const [listingType, setListingType] = useState('Both');
   const [minPrice, setMinPrice] = useState('');
@@ -323,7 +322,6 @@ export const Search: React.FC = () => {
         searchKeywords,
         categories: selectedCategories,
         condition: selectedCondition || null,
-        minFeedback: minFeedback ? parseInt(minFeedback) : null,
         itemLocation: itemLocation !== 'Default' ? itemLocation : null,
         buyingFormat: listingType,
         minPrice: minPrice ? parseFloat(minPrice) : null,
@@ -389,6 +387,7 @@ export const Search: React.FC = () => {
             buyingFormat: filters.buyingFormat,
             minPrice: filters.minPrice,
             maxPrice: filters.maxPrice,
+            itemLocation: filters.itemLocation,
             freeShipping: filters.freeShipping,
             returnsAccepted: filters.returnsAccepted,
             freeReturns: filters.freeReturns,
@@ -524,18 +523,6 @@ export const Search: React.FC = () => {
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Min Feedback */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">Min Seller Feedback</label>
-            <input
-              type="number"
-              value={minFeedback}
-              onChange={(e) => setMinFeedback(e.target.value)}
-              placeholder="e.g., 100"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            />
           </div>
 
           {/* Item Location */}
@@ -732,8 +719,10 @@ export const Search: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
             {items.filter((item) => item?.itemId).map((item) => {
               const isAuction = item.buyingOptions?.includes('AUCTION');
-              const displayPriceValue = isAuction && item.currentBidPrice?.value
-                ? item.currentBidPrice.value
+              // For auction items: show current bid if available, otherwise show price (BIN or starting bid)
+              // For non-auction items: show price (fixed price)
+              const displayPriceValue = isAuction 
+                ? (item.currentBidPrice?.value || item.price?.value)
                 : item.price?.value;
               const displayPrice = displayPriceValue ? parseFloat(displayPriceValue).toFixed(2) : 'N/A';
 
