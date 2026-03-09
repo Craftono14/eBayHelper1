@@ -59,14 +59,15 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           userId,
           isEbayImported: true,
           currentPrice: { not: null },
-          OR: [
-            { targetPrice: null },
-            { targetPriceSetManually: false },
+          AND: [
+            { targetPriceSetManually: false }, // Only auto-set or no alerts
           ],
         },
         select: {
           id: true,
           currentPrice: true,
+          targetPrice: true,
+          targetPriceSetManually: true,
         },
       });
 
@@ -100,6 +101,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
         itemTitle: true,
         currentPrice: true,
         targetPrice: true,
+        targetPriceSetManually: true,
       },
     });
 
@@ -109,13 +111,18 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       return Number.isFinite(currentPrice) && Number.isFinite(targetPrice) && currentPrice <= targetPrice;
     });
 
-    // Clear the alerts for triggered items and reapply percentage if global percentage exists
+    // Process triggered alerts: keep manual alerts, reset auto alerts with percentage if set
     if (triggeredItems.length > 0) {
       for (const item of triggeredItems) {
+        // Skip manually set alerts - user needs to manually remove/edit them
+        if (item.targetPriceSetManually) {
+          continue;
+        }
+
         const currentPrice = parseFloat(item.currentPrice!.toString());
         
         if (globalPercentage !== null && globalPercentage > 0) {
-          // Reapply percentage based on new current price
+          // Reapply percentage based on new current price for auto alerts
           const newTarget = currentPrice * (1 - globalPercentage / 100);
           await prisma.wishlistItem.update({
             where: { id: item.id },
@@ -125,7 +132,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
             },
           });
         } else {
-          // No global percentage, just clear the alert
+          // No global percentage, just clear the auto alert
           await prisma.wishlistItem.update({
             where: { id: item.id },
             data: {
