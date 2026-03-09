@@ -136,7 +136,8 @@ export const SearchResults: React.FC = () => {
     }
 
     // Currency filter (can only be used when there's a price filter)
-    if (search.currency && hasPriceFilter) {
+    // Only add if currency is not USD (default) to allow searching all currencies
+    if (search.currency && search.currency !== 'USD' && hasPriceFilter) {
       filters.push(`priceCurrency:${search.currency}`);
     }
 
@@ -177,6 +178,22 @@ export const SearchResults: React.FC = () => {
 
     if (search.freeReturns) {
       filters.push('freeReturns:true');
+    }
+
+    // Search in description filter
+    if (search.searchInDescription) {
+      filters.push('searchInDescription:true');
+    }
+
+    // Item location filter
+    if (search.itemLocation && search.itemLocation !== 'Default') {
+      if (search.itemLocation === 'US Only') {
+        filters.push('itemLocationCountry:US');
+      } else if (search.itemLocation === 'North America') {
+        filters.push('itemLocationRegion:NORTH_AMERICA');
+      } else if (search.itemLocation === 'Worldwide') {
+        filters.push('itemLocationRegion:WORLDWIDE');
+      }
     }
 
     if (
@@ -221,7 +238,8 @@ export const SearchResults: React.FC = () => {
         }
 
         // Currency filter (can only be used when there's a price filter)
-        if (tempSearch.currency && hasPriceFilter) {
+        // Only add if currency is not USD (default) to allow searching all currencies
+        if (tempSearch.currency && tempSearch.currency !== 'USD' && hasPriceFilter) {
           filters.push(`priceCurrency:${tempSearch.currency}`);
         }
         
@@ -270,6 +288,17 @@ export const SearchResults: React.FC = () => {
 
         if (tempSearch.searchInDescription) {
           filters.push('searchInDescription:true');
+        }
+
+        // Item location filter
+        if (tempSearch.itemLocation && tempSearch.itemLocation !== 'Default') {
+          if (tempSearch.itemLocation === 'US Only') {
+            filters.push('itemLocationCountry:US');
+          } else if (tempSearch.itemLocation === 'North America') {
+            filters.push('itemLocationRegion:NORTH_AMERICA');
+          } else if (tempSearch.itemLocation === 'Worldwide') {
+            filters.push('itemLocationRegion:WORLDWIDE');
+          }
         }
         
         setFilterParam(filters.join(','));

@@ -68,7 +68,7 @@ export const Search: React.FC = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedCondition, setSelectedCondition] = useState<string>('');
   const [minFeedback, setMinFeedback] = useState('');
-  const [itemLocation, setItemLocation] = useState('All Locations');
+  const [itemLocation, setItemLocation] = useState('Default');
   const [listingType, setListingType] = useState('Both');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -91,7 +91,7 @@ export const Search: React.FC = () => {
   const [categoryConfig, setCategoryConfig] = useState<CategoryConfig>({
     categories: [],
     conditions: ['New', 'Refurbished', 'Used', 'For parts or not working'],
-    itemLocations: ['US', 'Canada', 'UK', 'Australia', 'Germany', 'France', 'All Locations'],
+    itemLocations: ['Default', 'US Only', 'North America', 'Worldwide'],
     listingTypes: [
       { value: 'Buy It Now', label: 'Buy It Now' },
       { value: 'Auction', label: 'Auction' },
@@ -230,6 +230,7 @@ export const Search: React.FC = () => {
     returnsAccepted: boolean;
     freeReturns: boolean;
     searchInDescription: boolean;
+    itemLocation: string | null;
     sortBy: string;
   }): string => {
     const parts: string[] = [];
@@ -245,7 +246,8 @@ export const Search: React.FC = () => {
     }
 
     // priceCurrency can only be used when there's a price filter
-    if (filters.currency && hasPriceFilter) {
+    // Only add if currency is not USD (default) to allow searching all currencies
+    if (filters.currency && filters.currency !== 'USD' && hasPriceFilter) {
       parts.push(`priceCurrency:${filters.currency}`);
     }
 
@@ -289,6 +291,17 @@ export const Search: React.FC = () => {
       parts.push('searchInDescription:true');
     }
 
+    // Item location filter
+    if (filters.itemLocation) {
+      if (filters.itemLocation === 'US Only') {
+        parts.push('itemLocationCountry:US');
+      } else if (filters.itemLocation === 'North America') {
+        parts.push('itemLocationRegion:NORTH_AMERICA');
+      } else if (filters.itemLocation === 'Worldwide') {
+        parts.push('itemLocationRegion:WORLDWIDE');
+      }
+    }
+
     if (isPricePlusShippingSort(filters.sortBy)) {
       parts.push('deliveryPostalCode:80011');
     }
@@ -312,7 +325,7 @@ export const Search: React.FC = () => {
         categories: selectedCategories,
         condition: selectedCondition || null,
         minFeedback: minFeedback ? parseInt(minFeedback) : null,
-        itemLocation: itemLocation !== 'All Locations' ? itemLocation : null,
+        itemLocation: itemLocation !== 'Default' ? itemLocation : null,
         buyingFormat: listingType,
         minPrice: minPrice ? parseFloat(minPrice) : null,
         maxPrice: maxPrice ? parseFloat(maxPrice) : null,
@@ -337,6 +350,7 @@ export const Search: React.FC = () => {
         returnsAccepted: filters.returnsAccepted,
         freeReturns: filters.freeReturns,
         searchInDescription: filters.searchInDescription,
+        itemLocation: filters.itemLocation,
         sortBy: filters.sortBy,
       });
 

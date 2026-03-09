@@ -103,7 +103,7 @@ const categories = buildCategoryTree(lines);
 const output = {
   categories,
   conditions: ['New', 'Refurbished', 'Used', 'For parts or not working'],
-  itemLocations: ['US', 'Canada', 'UK', 'Australia', 'Germany', 'France', 'All Locations'],
+  itemLocations: ['Default', 'US Only', 'North America', 'Worldwide'],
   listingTypes: [
     { value: 'Buy It Now', label: 'Buy It Now' },
     { value: 'Auction', label: 'Auction' },

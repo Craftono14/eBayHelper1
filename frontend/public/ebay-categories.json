@@ -105029,13 +105029,10 @@
     "For parts or not working"
   ],
   "itemLocations": [
-    "US",
-    "Canada",
-    "UK",
-    "Australia",
-    "Germany",
-    "France",
-    "All Locations"
+    "Default",
+    "US Only",
+    "North America",
+    "Worldwide"
   ],
   "listingTypes": [
     {
