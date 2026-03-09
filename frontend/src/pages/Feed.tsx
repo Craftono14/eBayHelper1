@@ -11,6 +11,10 @@ interface ItemSummary {
     value: string;
     currency: string;
   };
+  currentBidPrice?: {
+    value: string;
+    currency: string;
+  };
   buyingOptions: string[];
   shippingOptions?: Array<{
     shippingCost: {
@@ -228,7 +232,17 @@ export const Feed: React.FC = () => {
           <div className="feed-grid gap-6 mb-8">
             {items.filter(item => item?.itemId).map((item) => {
               try {
-                const price = item.price?.value ? parseFloat(item.price.value).toFixed(2) : 'N/A';
+                // For auction items: show bid price if bids exist, otherwise show BIN or starting bid
+                const isAuction = item.buyingOptions?.includes('AUCTION');
+                let price = 'N/A';
+                
+                if (isAuction && item.currentBidPrice?.value) {
+                  // Has active bids - show current bid price
+                  price = parseFloat(item.currentBidPrice.value).toFixed(2);
+                } else if (item.price?.value) {
+                  // No active bids or not auction - show price/BIN/starting bid
+                  price = parseFloat(item.price.value).toFixed(2);
+                }
                 
                 return (
                   <a

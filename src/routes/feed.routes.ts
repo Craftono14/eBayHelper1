@@ -143,6 +143,7 @@ async function fetchSearchItems(
       title: item.title,
       image: item.image,
       price: item.price,
+      currentBidPrice: item.currentBidPrice,
       buyingOptions: item.buyingOptions || [],
       shippingOptions: item.shippingOptions,
       itemWebUrl: item.itemWebUrl,
