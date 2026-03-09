@@ -106,7 +106,7 @@ export async function fetchAndSaveEbayDealsForUser(userId: number): Promise<void
               itemTitle: deal.title,
               itemUrl: deal.url,
               currentPrice: deal.currentPrice,
-              targetPrice: search.maxPrice || 0,
+              targetPrice: null,
               seller: deal.seller,
               lowestPriceRecorded: deal.currentPrice,
               highestPriceRecorded: deal.currentPrice,

@@ -438,7 +438,7 @@ router.post('/wishlist', requireAuth, async (req: Request, res: Response): Promi
         ebayItemId,
         itemTitle: itemTitle || 'Unknown Item',
         itemUrl: itemUrl || '',
-        targetPrice: targetPrice ? parseFloat(targetPrice) : 0,
+        targetPrice: targetPrice ? parseFloat(targetPrice) : null,
         currentPrice: 0,
         lowestPriceRecorded: 0,
         highestPriceRecorded: 0,

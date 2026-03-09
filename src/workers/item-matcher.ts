@@ -123,7 +123,7 @@ export async function saveNewItems(
           ebayItemId: item.itemId,
           itemTitle: item.title,
           currentPrice: item.price,
-          targetPrice: item.price,
+          targetPrice: null,
           lastCheckedAt: new Date(),
         },
       });

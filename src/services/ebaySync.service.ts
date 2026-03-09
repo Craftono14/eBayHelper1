@@ -525,7 +525,7 @@ export class EbaySyncService {
                 itemImageUrl: ebayItem.itemImageUrl,
                 currentPrice: currentPrice,
                 shippingCost: shippingCost,
-                targetPrice: currentPrice || 0, // Default to current price
+                targetPrice: null,
                 seller: ebayItem.seller?.username,
                 sellerRating: ebayItem.seller?.feedbackScore,
                 isEbayImported: true,

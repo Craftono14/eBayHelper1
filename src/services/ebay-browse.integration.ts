@@ -68,7 +68,7 @@ export async function searchAndSaveResults(
           ebayItemId: item.itemId,
           itemTitle: item.title,
           currentPrice: item.price?.value ? parseFloat(item.price.value) : undefined,
-          targetPrice: item.price?.value ? parseFloat(item.price.value) : 0,
+          targetPrice: null,
           seller: item.seller?.username,
           itemUrl: item.itemHref || '',
           lastCheckedAt: new Date(),
