@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 interface ItemSummary {
   itemId: string;
@@ -60,7 +59,6 @@ interface CategoryConfig {
 
 export const Search: React.FC = () => {
   const { isLoggedIn } = useAuth();
-  const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
   // Form state
@@ -307,6 +305,172 @@ export const Search: React.FC = () => {
     return parts.join(',');
   };
 
+  // Get all descendant category IDs from a category node
+  const getAllDescendantIds = (categoryId: string, categories: CategoryNode[]): string[] => {
+    const ids: string[] = [categoryId];
+    
+    const findAndCollect = (nodes: CategoryNode[]) => {
+      for (const node of nodes) {
+        if (node.id === categoryId && node.children) {
+          const collectChildren = (children: CategoryNode[]) => {
+            for (const child of children) {
+              ids.push(child.id);
+              if (child.children) {
+                collectChildren(child.children);
+              }
+            }
+          };
+          collectChildren(node.children);
+          return true;
+        }
+        if (node.children && findAndCollect(node.children)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    
+    findAndCollect(categories);
+    return ids;
+  };
+
+  // Simplify categories by removing children if parent is selected
+  const simplifyCategories = (selectedIds: string[]): string[] => {
+    if (selectedIds.length <= 1) return selectedIds;
+    
+    const simplified = new Set(selectedIds);
+    
+    // For each selected category, check if any other selected category contains it
+    for (const categoryId of selectedIds) {
+      for (const otherCategoryId of selectedIds) {
+        if (categoryId === otherCategoryId) continue;
+        
+        // Get all descendants of otherCategoryId
+        const descendants = getAllDescendantIds(otherCategoryId, categoryConfig.categories);
+        
+        // If categoryId is a descendant of otherCategoryId, remove categoryId
+        if (descendants.includes(categoryId)) {
+          simplified.delete(categoryId);
+          break;
+        }
+      }
+    }
+    
+    return Array.from(simplified);
+  };
+
+  // Perform multi-category search and combine results
+  const performMultiCategorySearch = async (
+    categories: string[],
+    searchParams: {
+      keywords: string;
+      sortParam: string;
+      filterParam: string;
+    }
+  ): Promise<{ items: ItemSummary[]; total: number }> => {
+    const { keywords, sortParam, filterParam } = searchParams;
+    
+    // Perform parallel searches for each category
+    const searchPromises = categories.map(async (categoryId) => {
+      let url = `/api/browse/search?q=${encodeURIComponent(keywords)}&limit=50&offset=0`;
+      if (sortParam) {
+        url += `&sort=${encodeURIComponent(sortParam)}`;
+      }
+      if (filterParam) {
+        url += `&filter=${encodeURIComponent(filterParam)}`;
+      }
+      url += `&category_ids=${encodeURIComponent(categoryId)}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to search category ${categoryId}`);
+      }
+      
+      const data: SearchResponse = await response.json();
+      return {
+        categoryId,
+        items: data.items || [],
+        total: data.total || 0,
+      };
+    });
+    
+    const results = await Promise.all(searchPromises);
+    
+    // Deduplicate items by itemId
+    const seenIds = new Set<string>();
+    let combinedItems: ItemSummary[] = [];
+    
+    // Check if using Best Match sort (no sort param or default)
+    const isBestMatch = !sortParam || sortParam === '';
+    
+    if (isBestMatch) {
+      // Mix results proportionally for Best Match
+      const totalResults = results.reduce((sum, r) => sum + r.total, 0);
+      
+      // Calculate how many items to take from each category result
+      const itemQueues = results.map(r => ({
+        items: [...r.items],
+        weight: r.total / totalResults,
+        nextInsertAt: 0,
+      }));
+      
+      let position = 0;
+      while (itemQueues.some(q => q.items.length > 0)) {
+        // Find which queue should provide the next item
+        for (const queue of itemQueues) {
+          if (queue.items.length > 0 && position >= queue.nextInsertAt) {
+            const item = queue.items.shift()!;
+            if (!seenIds.has(item.itemId)) {
+              seenIds.add(item.itemId);
+              combinedItems.push(item);
+            }
+            // Calculate next insert position based on weight
+            queue.nextInsertAt = position + Math.ceil(1 / queue.weight);
+          }
+        }
+        position++;
+        
+        // Safety check to prevent infinite loops
+        if (position > 1000) break;
+      }
+    } else {
+      // For other sorts, combine all results then re-sort
+      const allItems: ItemSummary[] = [];
+      for (const result of results) {
+        for (const item of result.items) {
+          if (!seenIds.has(item.itemId)) {
+            seenIds.add(item.itemId);
+            allItems.push(item);
+          }
+        }
+      }
+      
+      // Re-sort combined results based on sort parameter
+      if (sortParam === 'price' || sortParam === '-price') {
+        allItems.sort((a, b) => {
+          const priceA = parseFloat(a.price?.value || a.currentBidPrice?.value || '0');
+          const priceB = parseFloat(b.price?.value || b.currentBidPrice?.value || '0');
+          return sortParam === 'price' ? priceA - priceB : priceB - priceA;
+        });
+      } else if (sortParam === 'endingSoonest') {
+        // Note: itemEndDate would need to be added to ItemSummary interface if available
+        // For now, keep original order
+      } else if (sortParam === 'newlyListed') {
+        // Note: itemStartDate would need to be added to ItemSummary interface if available
+        // For now, keep original order
+      }
+      
+      combinedItems = allItems;
+    }
+    
+    const totalCount = results.reduce((sum, r) => sum + r.total, 0);
+    
+    return {
+      items: combinedItems,
+      total: totalCount,
+    };
+  };
+
   const handleSearch = async () => {
     if (!searchKeywords.trim()) {
       setError('Please enter search keywords');
@@ -353,7 +517,23 @@ export const Search: React.FC = () => {
 
       setDebugFilter(filterParam || '(none)');
 
-      if (selectedCategories.length <= 1) {
+      // Simplify categories to remove redundant child selections
+      const simplifiedCategories = simplifyCategories(selectedCategories);
+      
+      if (simplifiedCategories.length > 1) {
+        // Multi-category search: perform parallel searches and combine results
+        setDebugRequest(`Multi-category search for ${simplifiedCategories.length} categories: ${simplifiedCategories.join(', ')}`);
+        
+        const result = await performMultiCategorySearch(simplifiedCategories, {
+          keywords: filters.searchKeywords,
+          sortParam,
+          filterParam,
+        });
+        
+        setItems(result.items);
+        setTotal(result.total);
+      } else {
+        // Single or no category: standard search
         let url = `/api/browse/search?q=${encodeURIComponent(filters.searchKeywords)}&limit=50&offset=0`;
         if (sortParam) {
           url += `&sort=${encodeURIComponent(sortParam)}`;
@@ -361,8 +541,8 @@ export const Search: React.FC = () => {
         if (filterParam) {
           url += `&filter=${encodeURIComponent(filterParam)}`;
         }
-        if (filters.categories.length === 1) {
-          url += `&category_ids=${encodeURIComponent(filters.categories[0])}`;
+        if (simplifiedCategories.length === 1) {
+          url += `&category_ids=${encodeURIComponent(simplifiedCategories[0])}`;
         }
 
         setDebugRequest(url);
@@ -376,28 +556,6 @@ export const Search: React.FC = () => {
         const data: SearchResponse = await response.json();
         setItems(data.items || []);
         setTotal(data.total || 0);
-      } else {
-        setDebugRequest('/search-results (temporarySearch localStorage payload)');
-        localStorage.setItem(
-          'temporarySearch',
-          JSON.stringify({
-            searchKeywords: filters.searchKeywords,
-            categories: filters.categories,
-            condition: filters.condition,
-            buyingFormat: filters.buyingFormat,
-            minPrice: filters.minPrice,
-            maxPrice: filters.maxPrice,
-            itemLocation: filters.itemLocation,
-            freeShipping: filters.freeShipping,
-            returnsAccepted: filters.returnsAccepted,
-            freeReturns: filters.freeReturns,
-            searchInDescription: filters.searchInDescription,
-            currency: filters.currency,
-            sortBy: filters.sortBy,
-            sortOrder: filters.sortOrder,
-          })
-        );
-        navigate('/search-results');
       }
 
       if (searchName) {
