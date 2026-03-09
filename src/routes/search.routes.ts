@@ -386,6 +386,7 @@ router.get('/wishlist', requireAuth, async (req: Request, res: Response): Promis
               ? Number(item.priceHistory?.[0]?.shippingCost)
               : null,
         targetPrice: item.targetPrice != null ? Number(item.targetPrice) : null,
+        targetPriceSetManually: item.targetPriceSetManually || false,
         seller: item.seller,
         sellerRating: item.sellerRating,
         isActive: item.isActive,

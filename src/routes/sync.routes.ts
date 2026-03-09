@@ -42,6 +42,50 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       // Continue to return partial results
     }
 
+    // Get user's global price drop percentage
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { globalPriceDropPercentage: true },
+    });
+
+    const globalPercentage = user?.globalPriceDropPercentage
+      ? parseFloat(user.globalPriceDropPercentage.toString())
+      : null;
+
+    // Apply global percentage to items without manual alerts
+    if (globalPercentage !== null && globalPercentage > 0) {
+      const itemsWithoutManualAlerts = await prisma.wishlistItem.findMany({
+        where: {
+          userId,
+          isEbayImported: true,
+          currentPrice: { not: null },
+          OR: [
+            { targetPrice: null },
+            { targetPriceSetManually: false },
+          ],
+        },
+        select: {
+          id: true,
+          currentPrice: true,
+        },
+      });
+
+      for (const item of itemsWithoutManualAlerts) {
+        const currentPrice = parseFloat(item.currentPrice!.toString());
+        const calculatedTarget = currentPrice * (1 - globalPercentage / 100);
+
+        await prisma.wishlistItem.update({
+          where: { id: item.id },
+          data: {
+            targetPrice: calculatedTarget,
+            targetPriceSetManually: false,
+          },
+        });
+      }
+
+      console.log(`[sync] Applied global percentage (${globalPercentage}%) to ${itemsWithoutManualAlerts.length} items`);
+    }
+
     // Find any price alerts that were triggered by this sync run.
     const recentlySyncedItems = await prisma.wishlistItem.findMany({
       where: {
@@ -65,17 +109,34 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       return Number.isFinite(currentPrice) && Number.isFinite(targetPrice) && currentPrice <= targetPrice;
     });
 
-    // Clear the alerts for triggered items so user is only notified once
+    // Clear the alerts for triggered items and reapply percentage if global percentage exists
     if (triggeredItems.length > 0) {
-      await prisma.wishlistItem.updateMany({
-        where: {
-          id: { in: triggeredItems.map(item => item.id) },
-        },
-        data: {
-          targetPrice: null,
-        },
-      });
-      console.log(`[sync] Cleared ${triggeredItems.length} triggered price alerts`);
+      for (const item of triggeredItems) {
+        const currentPrice = parseFloat(item.currentPrice!.toString());
+        
+        if (globalPercentage !== null && globalPercentage > 0) {
+          // Reapply percentage based on new current price
+          const newTarget = currentPrice * (1 - globalPercentage / 100);
+          await prisma.wishlistItem.update({
+            where: { id: item.id },
+            data: {
+              targetPrice: newTarget,
+              targetPriceSetManually: false,
+            },
+          });
+        } else {
+          // No global percentage, just clear the alert
+          await prisma.wishlistItem.update({
+            where: { id: item.id },
+            data: {
+              targetPrice: null,
+              targetPriceSetManually: false,
+            },
+          });
+        }
+      }
+      
+      console.log(`[sync] Processed ${triggeredItems.length} triggered price alerts`);
     }
 
     const alertsTriggered = triggeredItems.map((item) => item.itemTitle || 'Untitled Item');

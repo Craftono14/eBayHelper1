@@ -10,6 +10,7 @@ interface WishlistItem {
   currentPrice: number | null;
   shippingCost: number | null;
   targetPrice: number | null;
+  targetPriceSetManually: boolean;
   seller: string | null;
   sellerRating: number | null;
   isActive: boolean;
@@ -36,6 +37,9 @@ export const Wishlist: React.FC = () => {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [targetPriceInput, setTargetPriceInput] = useState<string>('');
+  const [globalPercentage, setGlobalPercentage] = useState<number | null>(null);
+  const [globalPercentageInput, setGlobalPercentageInput] = useState<string>('');
+  const [savingGlobalPercentage, setSavingGlobalPercentage] = useState(false);
 
   const fetchWishlist = async () => {
     try {
@@ -61,6 +65,25 @@ export const Wishlist: React.FC = () => {
     }
   };
 
+  const fetchGlobalPercentage = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/prices/global-percentage', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGlobalPercentage(data.globalPriceDropPercentage);
+        setGlobalPercentageInput(data.globalPriceDropPercentage?.toString() || '');
+      }
+    } catch (err) {
+      console.error('Failed to fetch global percentage:', err);
+    }
+  };
+
   useEffect(() => {
     if (!isLoggedIn) {
       setLoading(false);
@@ -68,6 +91,7 @@ export const Wishlist: React.FC = () => {
     }
 
     fetchWishlist();
+    fetchGlobalPercentage();
   }, [isLoggedIn, filter]);
 
   const handleSyncWithEbay = async () => {
@@ -197,6 +221,67 @@ export const Wishlist: React.FC = () => {
     }
   };
 
+  const handleSaveGlobalPercentage = async () => {
+    const percentageValue = parseFloat(globalPercentageInput);
+    
+    if (isNaN(percentageValue) || percentageValue < 0 || percentageValue > 100) {
+      setError('Please enter a valid percentage between 0 and 100');
+      return;
+    }
+
+    try {
+      setSavingGlobalPercentage(true);
+      setError('');
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/prices/global-percentage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ percentage: percentageValue }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save global percentage');
+      }
+
+      setGlobalPercentage(percentageValue);
+      setNotificationMessage(`Global price drop percentage set to ${percentageValue}%`);
+      await fetchWishlist();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save global percentage');
+    } finally {
+      setSavingGlobalPercentage(false);
+    }
+  };
+
+  const handleRemoveGlobalPercentage = async () => {
+    try {
+      setError('');
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/prices/global-percentage', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove global percentage');
+      }
+
+      setGlobalPercentage(null);
+      setGlobalPercentageInput('');
+      setNotificationMessage('Global price drop percentage removed');
+      await fetchWishlist();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove global percentage');
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="text-center py-16">
@@ -285,6 +370,44 @@ export const Wishlist: React.FC = () => {
         </div>
       )}
 
+      {/* Global Price Drop Percentage */}
+      <div className="bg-gray-50 p-4 rounded-lg mb-6">
+        <div className="flex items-center gap-3">
+          <label className="font-medium text-gray-700">Global Price Drop Percentage:</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={globalPercentageInput}
+            onChange={(e) => setGlobalPercentageInput(e.target.value)}
+            placeholder="e.g., 10 for 10%"
+            className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            onClick={handleSaveGlobalPercentage}
+            disabled={savingGlobalPercentage}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition disabled:bg-gray-400"
+          >
+            {savingGlobalPercentage ? 'Saving...' : 'Save'}
+          </button>
+          {globalPercentage !== null && (
+            <button
+              onClick={handleRemoveGlobalPercentage}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition"
+            >
+              Remove
+            </button>
+          )}
+          {globalPercentage !== null && (
+            <span className="text-sm text-gray-600">Current: {globalPercentage}%</span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Automatically sets price alerts for all items without manual alerts. Alerts reset when triggered.
+        </p>
+      </div>
+
       {loading ? (
         <div className="text-center py-12">
           <p className="text-gray-600">Loading your wishlist...</p>
@@ -357,7 +480,7 @@ export const Wishlist: React.FC = () => {
                       {item.listingStatus || (item.isActive ? 'Active' : 'Ended')}
                     </div>
                     {item.targetPrice && (
-                      <div className="font-semibold text-indigo-600">
+                      <div className={`font-semibold ${item.targetPriceSetManually ? 'text-green-600' : 'text-blue-600'}`}>
                         <span className="font-medium">Price Alert:</span> ${item.targetPrice.toFixed(2)}
                       </div>
                     )}

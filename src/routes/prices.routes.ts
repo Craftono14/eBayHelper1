@@ -346,7 +346,10 @@ export function createPriceMonitoringRouter(
 
         const item = await prisma.wishlistItem.update({
           where: { id: wishlistItemId },
-          data: { targetPrice },
+          data: { 
+            targetPrice,
+            targetPriceSetManually: true, // Mark as manually set
+          },
         });
 
         res.json({
@@ -375,7 +378,10 @@ export function createPriceMonitoringRouter(
 
         const item = await prisma.wishlistItem.update({
           where: { id: wishlistItemId },
-          data: { targetPrice: null },
+          data: { 
+            targetPrice: null,
+            targetPriceSetManually: false,
+          },
         });
 
         res.json({
@@ -385,6 +391,114 @@ export function createPriceMonitoringRouter(
         });
       } catch (error) {
         console.error('[priceRoutes] Target price removal failed:', error);
+        res.status(500).json({
+          error: (error as Error).message,
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /api/prices/global-percentage
+   * Get user's global price drop percentage
+   */
+  router.get(
+    '/global-percentage',
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+          res.status(401).json({ error: 'User not authenticated' });
+          return;
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { globalPriceDropPercentage: true },
+        });
+
+        res.json({
+          globalPriceDropPercentage: user?.globalPriceDropPercentage
+            ? parseFloat(user.globalPriceDropPercentage.toString())
+            : null,
+        });
+      } catch (error) {
+        console.error('[priceRoutes] Get global percentage failed:', error);
+        res.status(500).json({
+          error: (error as Error).message,
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /api/prices/global-percentage
+   * Set user's global price drop percentage
+   */
+  router.post(
+    '/global-percentage',
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const userId = (req as any).user?.id;
+        const { percentage } = req.body;
+
+        if (!userId) {
+          res.status(401).json({ error: 'User not authenticated' });
+          return;
+        }
+
+        if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
+          res.status(400).json({
+            error: 'Percentage must be a number between 0 and 100',
+          });
+          return;
+        }
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { globalPriceDropPercentage: percentage },
+        });
+
+        res.json({
+          success: true,
+          globalPriceDropPercentage: percentage,
+        });
+      } catch (error) {
+        console.error('[priceRoutes] Set global percentage failed:', error);
+        res.status(500).json({
+          error: (error as Error).message,
+        });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/prices/global-percentage
+   * Remove user's global price drop percentage
+   */
+  router.delete(
+    '/global-percentage',
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+          res.status(401).json({ error: 'User not authenticated' });
+          return;
+        }
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: { globalPriceDropPercentage: null },
+        });
+
+        res.json({
+          success: true,
+          message: 'Global price drop percentage removed',
+        });
+      } catch (error) {
+        console.error('[priceRoutes] Delete global percentage failed:', error);
         res.status(500).json({
           error: (error as Error).message,
         });

@@ -34,6 +34,9 @@ model User {
   // Account deletion compliance (GDPR/eBay policy)
   deletedAt               DateTime?      // Soft delete timestamp for compliance
   
+  // Price alert settings
+  globalPriceDropPercentage Decimal?     @db.Decimal(5, 2) // Global percentage for auto price alerts (e.g., 10.00 for 10%)
+  
   // Metadata
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
@@ -158,6 +161,7 @@ model WishlistItem {
   currentPrice            Decimal?       @db.Decimal(10, 2)
   shippingCost            Decimal?       @db.Decimal(10, 2)
   targetPrice             Decimal?       @db.Decimal(10, 2) // Optional alert threshold; null means no price alert set
+  targetPriceSetManually  Boolean        @default(false) // True if user manually set alert, false if auto-set by percentage
   lowestPriceRecorded     Decimal?       @db.Decimal(10, 2)
   highestPriceRecorded    Decimal?       @db.Decimal(10, 2)
   
