@@ -62,7 +62,7 @@ export const Search: React.FC = () => {
   // Form state
   const [searchKeywords, setSearchKeywords] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [selectedCondition, setSelectedCondition] = useState<string>('');
   const [minFeedback, setMinFeedback] = useState('');
   const [itemLocation, setItemLocation] = useState('All Locations');
   const [listingType, setListingType] = useState('Both');
@@ -82,6 +82,8 @@ export const Search: React.FC = () => {
   const [error, setError] = useState('');
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [total, setTotal] = useState(0);
+  const [debugFilter, setDebugFilter] = useState('');
+  const [debugRequest, setDebugRequest] = useState('');
   const [categoryConfig, setCategoryConfig] = useState<CategoryConfig>({
     categories: [],
     conditions: ['New', 'Refurbished', 'Used', 'For parts or not working'],
@@ -221,6 +223,8 @@ export const Search: React.FC = () => {
     condition: string | null;
     buyingFormat: string;
     freeShipping: boolean;
+    returnsAccepted: boolean;
+    freeReturns: boolean;
     sortBy: string;
   }): string => {
     const parts: string[] = [];
@@ -265,6 +269,14 @@ export const Search: React.FC = () => {
       parts.push('maxDeliveryCost:0');
     }
 
+    if (filters.returnsAccepted) {
+      parts.push('returnsAccepted:true');
+    }
+
+    if (filters.freeReturns) {
+      parts.push('freeReturns:true');
+    }
+
     if (isPricePlusShippingSort(filters.sortBy)) {
       parts.push('deliveryPostalCode:80011');
     }
@@ -286,7 +298,7 @@ export const Search: React.FC = () => {
       const filters = {
         searchKeywords,
         categories: selectedCategories,
-        condition: selectedConditions.length > 0 ? selectedConditions[0] : null,
+        condition: selectedCondition || null,
         minFeedback: minFeedback ? parseInt(minFeedback) : null,
         itemLocation: itemLocation !== 'All Locations' ? itemLocation : null,
         buyingFormat: listingType,
@@ -302,18 +314,22 @@ export const Search: React.FC = () => {
         sortOrder: sortBy === 'PricePlusShippingHighest' ? 'Descending' : 'Ascending',
       };
 
-      if (selectedCategories.length <= 1) {
-        const sortParam = mapSortToBrowseAPI(filters.sortBy);
-        const filterParam = buildFilterString({
-          minPrice: filters.minPrice,
-          maxPrice: filters.maxPrice,
-          currency: filters.currency,
-          condition: filters.condition,
-          buyingFormat: filters.buyingFormat,
-          freeShipping: filters.freeShipping,
-          sortBy: filters.sortBy,
-        });
+      const sortParam = mapSortToBrowseAPI(filters.sortBy);
+      const filterParam = buildFilterString({
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        currency: filters.currency,
+        condition: filters.condition,
+        buyingFormat: filters.buyingFormat,
+        freeShipping: filters.freeShipping,
+        returnsAccepted: filters.returnsAccepted,
+        freeReturns: filters.freeReturns,
+        sortBy: filters.sortBy,
+      });
 
+      setDebugFilter(filterParam || '(none)');
+
+      if (selectedCategories.length <= 1) {
         let url = `/api/browse/search?q=${encodeURIComponent(filters.searchKeywords)}&limit=50&offset=0`;
         if (sortParam) {
           url += `&sort=${encodeURIComponent(sortParam)}`;
@@ -325,6 +341,8 @@ export const Search: React.FC = () => {
           url += `&category_ids=${encodeURIComponent(filters.categories[0])}`;
         }
 
+        setDebugRequest(url);
+
         const response = await fetch(url);
         if (!response.ok) {
           const errorData = await response.json();
@@ -335,6 +353,7 @@ export const Search: React.FC = () => {
         setItems(data.items || []);
         setTotal(data.total || 0);
       } else {
+        setDebugRequest('/search-results (temporarySearch localStorage payload)');
         localStorage.setItem(
           'temporarySearch',
           JSON.stringify({
@@ -345,6 +364,8 @@ export const Search: React.FC = () => {
             minPrice: filters.minPrice,
             maxPrice: filters.maxPrice,
             freeShipping: filters.freeShipping,
+            returnsAccepted: filters.returnsAccepted,
+            freeReturns: filters.freeReturns,
             currency: filters.currency,
             sortBy: filters.sortBy,
             sortOrder: filters.sortOrder,
@@ -448,24 +469,27 @@ export const Search: React.FC = () => {
         <div className="lg:col-span-1 space-y-6">
           {/* Conditions */}
           <div>
-            <label className="block text-lg font-semibold mb-3">Condition</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-lg font-semibold">Condition</label>
+              <button
+                type="button"
+                onClick={() => setSelectedCondition('')}
+                disabled={!selectedCondition}
+                className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                Clear
+              </button>
+            </div>
             <div className="space-y-2">
               {conditions.map((condition) => (
                 <div key={condition} className="flex items-center">
                   <input
-                    type="checkbox"
+                    type="radio"
+                    name="itemCondition"
                     id={`cond-${condition}`}
-                    checked={selectedConditions.includes(condition)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedConditions([...selectedConditions, condition]);
-                      } else {
-                        setSelectedConditions(
-                          selectedConditions.filter((c) => c !== condition)
-                        );
-                      }
-                    }}
-                    className="w-4 h-4 rounded"
+                    checked={selectedCondition === condition}
+                    onChange={() => setSelectedCondition(condition)}
+                    className="w-4 h-4"
                   />
                   <label htmlFor={`cond-${condition}`} className="ml-3 cursor-pointer">
                     {condition}
@@ -660,6 +684,12 @@ export const Search: React.FC = () => {
               Multi-category live results are not enabled yet. For now, this search opens the results page.
             </p>
           )}
+
+          <div className="bg-gray-100 border border-gray-200 rounded-lg p-3 text-xs text-gray-700">
+            <p className="font-semibold mb-1">Debug</p>
+            <p className="break-all"><span className="font-semibold">Request:</span> {debugRequest || '(run a search)'}</p>
+            <p className="break-all mt-1"><span className="font-semibold">Filter:</span> {debugFilter || '(run a search)'}</p>
+          </div>
         </div>
       </div>
 

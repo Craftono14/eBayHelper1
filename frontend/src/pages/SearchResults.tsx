@@ -43,6 +43,8 @@ interface SavedSearchDetails {
   itemLocation?: string | null;
   currency?: string | null;
   freeShipping?: boolean;
+  returnsAccepted?: boolean;
+  freeReturns?: boolean;
 }
 
 export const SearchResults: React.FC = () => {
@@ -160,6 +162,15 @@ export const SearchResults: React.FC = () => {
       filters.push('maxDeliveryCost:0');
     }
 
+    // Returns filters
+    if (search.returnsAccepted) {
+      filters.push('returnsAccepted:true');
+    }
+
+    if (search.freeReturns) {
+      filters.push('freeReturns:true');
+    }
+
     if (
       search.sortBy === 'PricePlusShipping' ||
       search.sortBy === 'PricePlusShippingLowest' ||
@@ -235,10 +246,10 @@ export const SearchResults: React.FC = () => {
 
         // Returns filters
         if (tempSearch.returnsAccepted) {
-          filters.push('return_accepted:true');
+          filters.push('returnsAccepted:true');
         }
         if (tempSearch.freeReturns) {
-          filters.push('return_method:FREE');
+          filters.push('freeReturns:true');
         }
         
         setFilterParam(filters.join(','));
