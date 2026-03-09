@@ -33,6 +33,8 @@ export const Wishlist: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [targetPriceInput, setTargetPriceInput] = useState<string>('');
 
   const fetchWishlist = async () => {
     try {
@@ -122,26 +124,50 @@ export const Wishlist: React.FC = () => {
     }
   };
 
-  const handlePriceDropNotification = async () => {
-    try {
-      setNotificationMessage('');
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/search/send-notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send notifications');
+  const handlePriceDropNotification = async (item: WishlistItem) => {
+    // If this item is already being edited, save the price
+    if (editingItemId === item.id) {
+      if (!targetPriceInput.trim()) {
+        setError('Please enter a valid price');
+        return;
       }
 
-      setNotificationMessage('Price drop notifications queued.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send notifications');
+      const priceValue = parseFloat(targetPriceInput);
+      if (isNaN(priceValue) || priceValue <= 0) {
+        setError('Please enter a valid positive number');
+        return;
+      }
+
+      try {
+        setError('');
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/prices/items/${item.id}/target`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ targetPrice: priceValue }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to set target price');
+        }
+
+        setNotificationMessage(`Price alert set to $${priceValue.toFixed(2)}`);
+        setEditingItemId(null);
+        setTargetPriceInput('');
+        await fetchWishlist();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to set target price');
+      }
+    } else {
+      // Start editing this item
+      setEditingItemId(item.id);
+      setTargetPriceInput(item.targetPrice ? item.targetPrice.toString() : '');
+      setError('');
+      setNotificationMessage('');
     }
   };
 
@@ -296,6 +322,11 @@ export const Wishlist: React.FC = () => {
                       <span className="font-medium">Status:</span>{' '}
                       {item.listingStatus || (item.isActive ? 'Active' : 'Ended')}
                     </div>
+                    {item.targetPrice && (
+                      <div className="font-semibold text-indigo-600">
+                        <span className="font-medium">Price Alert:</span> ${item.targetPrice.toFixed(2)}
+                      </div>
+                    )}
                   </div>
 
                   {item.seller && (
@@ -314,12 +345,42 @@ export const Wishlist: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <button
-                    onClick={handlePriceDropNotification}
-                    className="bg-indigo-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-indigo-700 transition text-sm"
-                  >
-                    Price Drop Notification
-                  </button>
+                  {editingItemId === item.id ? (
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={targetPriceInput}
+                        onChange={(e) => setTargetPriceInput(e.target.value)}
+                        placeholder="Enter price"
+                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handlePriceDropNotification(item)}
+                        className="bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 transition text-sm"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingItemId(null);
+                          setTargetPriceInput('');
+                        }}
+                        className="bg-gray-300 text-gray-700 px-3 py-2 rounded-lg font-medium hover:bg-gray-400 transition text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handlePriceDropNotification(item)}
+                      className="bg-indigo-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-indigo-700 transition text-sm whitespace-nowrap"
+                    >
+                      {item.targetPrice ? 'Edit Price Alert' : 'Set Price Alert'}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(item)}
                     disabled={item.isEbayImported}
