@@ -135,9 +135,8 @@ export const SearchResults: React.FC = () => {
       filters.push(`price:[..${search.maxPrice}]`);
     }
 
-    // Currency filter (can only be used when there's a price filter)
-    // Only add if currency is not USD (default) to allow searching all currencies
-    if (search.currency && search.currency !== 'USD' && hasPriceFilter) {
+    // Currency filter (must be used when there's a price filter)
+    if (hasPriceFilter && search.currency) {
       filters.push(`priceCurrency:${search.currency}`);
     }
 
@@ -237,9 +236,8 @@ export const SearchResults: React.FC = () => {
           filters.push(`price:[..${tempSearch.maxPrice}]`);
         }
 
-        // Currency filter (can only be used when there's a price filter)
-        // Only add if currency is not USD (default) to allow searching all currencies
-        if (tempSearch.currency && tempSearch.currency !== 'USD' && hasPriceFilter) {
+        // Currency filter (must be used when there's a price filter)
+        if (hasPriceFilter && tempSearch.currency) {
           filters.push(`priceCurrency:${tempSearch.currency}`);
         }
         

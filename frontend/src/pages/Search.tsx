@@ -245,9 +245,8 @@ export const Search: React.FC = () => {
       parts.push(`price:[..${filters.maxPrice}]`);
     }
 
-    // priceCurrency can only be used when there's a price filter
-    // Only add if currency is not USD (default) to allow searching all currencies
-    if (filters.currency && filters.currency !== 'USD' && hasPriceFilter) {
+    // priceCurrency must be included when price filter is used
+    if (hasPriceFilter && filters.currency) {
       parts.push(`priceCurrency:${filters.currency}`);
     }
 
