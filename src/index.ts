@@ -202,6 +202,15 @@ const startServer = async (): Promise<void> => {
     prisma = new PrismaClient();
     console.log('[STARTUP] Prisma Client initialized');
 
+    // Mount price monitoring routes (needs prisma to be initialized first)
+    try {
+      const accessToken = process.env.EBAY_ACCESS_TOKEN || '';
+      app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, accessToken));
+      console.log('[STARTUP] ✓ Price monitoring routes mounted at /api/prices');
+    } catch (err) {
+      console.error('[STARTUP] ✗ Failed to mount price monitoring routes:', err instanceof Error ? err.message : String(err));
+    }
+
     // Bind to port immediately - migrations should have already run via preDeployCommand
     console.log(`[STARTUP] Attempting to bind to 0.0.0.0:${port}`);
     const server = app.listen(port, '0.0.0.0', (): void => {
@@ -251,16 +260,6 @@ const startServer = async (): Promise<void> => {
         } catch (error) {
           console.error('  ✗ Worker initialization failed:', error instanceof Error ? error.message : String(error));
         }
-      }
-
-      // Mount price monitoring routes
-      try {
-        // Mount prices router regardless of env token (individual users have their own tokens)
-        const accessToken = process.env.EBAY_ACCESS_TOKEN || '';
-        app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, accessToken));
-        console.log('  ✓ Price monitoring routes mounted');
-      } catch (err) {
-        console.error('  ✗ Price monitoring routes failed:', err instanceof Error ? err.message : String(err));
       }
 
       console.log('[STARTUP] Background initialization complete');
