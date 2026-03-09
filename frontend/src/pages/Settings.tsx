@@ -23,7 +23,7 @@ export function Settings() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3001/api/users/discord-settings', {
+      const response = await fetch('/api/users/discord-settings', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -49,7 +49,7 @@ export function Settings() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3001/api/users/discord-settings', {
+      const response = await fetch('/api/users/discord-settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ export function Settings() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3001/api/users/discord-settings', {
+      const response = await fetch('/api/users/discord-settings', {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
