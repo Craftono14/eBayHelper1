@@ -60,11 +60,11 @@ async function getEbayAppToken(): Promise<string> {
   }
 }
 
-// Helper function to fetch items for a single search
+// Helper function to fetch items for a single search with optional single category
 async function fetchSearchItems(
   accessToken: string,
   searchKeywords: string,
-  categoryIds?: string,
+  categoryId?: string,
   minPrice?: number,
   maxPrice?: number,
   condition?: string,
@@ -121,17 +121,8 @@ async function fetchSearchItems(
     params.filter = filters.join(',');
   }
 
-  if (categoryIds) {
-    try {
-      const parsed = JSON.parse(categoryIds);
-      if (Array.isArray(parsed)) {
-        params.category_ids = parsed.join(',');
-      } else {
-        params.category_ids = categoryIds;
-      }
-    } catch {
-      params.category_ids = categoryIds;
-    }
+  if (categoryId) {
+    params.category_ids = categoryId;
   }
 
   try {
@@ -163,6 +154,79 @@ async function fetchSearchItems(
     console.error(`[feed] Error fetching items for "${searchKeywords}":`, error.response?.data || error.message);
     return [];
   }
+}
+
+// Helper function to fetch items for a multi-category search
+async function fetchSearchItemsMultiCategory(
+  accessToken: string,
+  searchKeywords: string,
+  categoriesJson?: string,
+  minPrice?: number,
+  maxPrice?: number,
+  condition?: string,
+  buyingFormat?: string
+): Promise<ItemSummary[]> {
+  // Parse categories JSON
+  let categoryIds: string[] = [];
+  if (categoriesJson) {
+    try {
+      const parsed = JSON.parse(categoriesJson);
+      if (Array.isArray(parsed)) {
+        categoryIds = parsed;
+      } else {
+        categoryIds = [String(parsed)];
+      }
+    } catch {
+      // If not JSON, treat as single category ID
+      categoryIds = [categoriesJson];
+    }
+  }
+
+  // If no categories or only one, use regular fetchSearchItems
+  if (categoryIds.length <= 1) {
+    return await fetchSearchItems(
+      accessToken,
+      searchKeywords,
+      categoryIds[0],
+      minPrice,
+      maxPrice,
+      condition,
+      buyingFormat
+    );
+  }
+
+  // Fetch items from all categories in parallel
+  const searchPromises = categoryIds.map(categoryId =>
+    fetchSearchItems(
+      accessToken,
+      searchKeywords,
+      categoryId,
+      minPrice,
+      maxPrice,
+      condition,
+      buyingFormat
+    ).catch(error => {
+      console.error(`[feed] Error fetching category ${categoryId} for search "${searchKeywords}":`, error.message);
+      return [];
+    })
+  );
+
+  const results = await Promise.all(searchPromises);
+
+  // Combine and deduplicate items from all categories
+  const seenIds = new Set<string>();
+  const combinedItems: ItemSummary[] = [];
+
+  for (const categoryItems of results) {
+    for (const item of categoryItems) {
+      if (!seenIds.has(item.itemId)) {
+        seenIds.add(item.itemId);
+        combinedItems.push(item);
+      }
+    }
+  }
+
+  return combinedItems;
 }
 
 /**
@@ -252,7 +316,8 @@ router.post('/refresh', requireAuth, async (req: Request, res: Response): Promis
       try {
         console.log(`[feed] Fetching results for search "${search.name}"`);
 
-        const items = await fetchSearchItems(
+        // Use multi-category handler (it will handle single category correctly too)
+        const items = await fetchSearchItemsMultiCategory(
           accessToken,
           search.searchKeywords,
           search.categories,
