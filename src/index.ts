@@ -255,10 +255,10 @@ const startServer = async (): Promise<void> => {
 
       // Mount price monitoring routes
       try {
-        if (process.env.EBAY_ACCESS_TOKEN) {
-          app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, process.env.EBAY_ACCESS_TOKEN));
-          console.log('  ✓ Price monitoring routes mounted');
-        }
+        // Mount prices router regardless of env token (individual users have their own tokens)
+        const accessToken = process.env.EBAY_ACCESS_TOKEN || '';
+        app.use('/api/prices', requireAuth, createPriceMonitoringRouter(prisma, accessToken));
+        console.log('  ✓ Price monitoring routes mounted');
       } catch (err) {
         console.error('  ✗ Price monitoring routes failed:', err instanceof Error ? err.message : String(err));
       }
