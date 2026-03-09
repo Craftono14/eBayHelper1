@@ -72,14 +72,14 @@ async function getEbayAppToken(): Promise<string> {
  */
 router.get('/search', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { q, limit = '50', offset = '0', sort, filter, category_ids, searchInDescription } = req.query;
+    const { q, limit = '50', offset = '0', sort, filter, category_ids } = req.query;
 
     if (!q || typeof q !== 'string') {
       res.status(400).json({ error: 'Missing required query parameter: q' });
       return;
     }
 
-    console.log('[browse] Search request:', { q, limit, offset, sort, filter, category_ids, searchInDescription });
+    console.log('[browse] Search request:', { q, limit, offset, sort, filter, category_ids });
 
     // Get app token for Browse API access
     const accessToken = await getEbayAppToken();
@@ -111,12 +111,6 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
     if (category_ids) {
       params.category_ids = category_ids.toString();
       console.log('[browse] Applied category_ids:', category_ids);
-    }
-
-    // Add searchInDescription parameter if provided
-    if (searchInDescription === 'true') {
-      params.searchInDescription = 'true';
-      console.log('[browse] Applied searchInDescription: true');
     }
 
     const response = await axios.get(browseUrl, {

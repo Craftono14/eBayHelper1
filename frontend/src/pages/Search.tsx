@@ -229,6 +229,7 @@ export const Search: React.FC = () => {
     freeShipping: boolean;
     returnsAccepted: boolean;
     freeReturns: boolean;
+    searchInDescription: boolean;
     sortBy: string;
   }): string => {
     const parts: string[] = [];
@@ -281,6 +282,10 @@ export const Search: React.FC = () => {
       parts.push('freeReturns:true');
     }
 
+    if (filters.searchInDescription) {
+      parts.push('searchInDescription:true');
+    }
+
     if (isPricePlusShippingSort(filters.sortBy)) {
       parts.push('deliveryPostalCode:80011');
     }
@@ -328,6 +333,7 @@ export const Search: React.FC = () => {
         freeShipping: filters.freeShipping,
         returnsAccepted: filters.returnsAccepted,
         freeReturns: filters.freeReturns,
+        searchInDescription: filters.searchInDescription,
         sortBy: filters.sortBy,
       });
 
@@ -343,9 +349,6 @@ export const Search: React.FC = () => {
         }
         if (filters.categories.length === 1) {
           url += `&category_ids=${encodeURIComponent(filters.categories[0])}`;
-        }
-        if (filters.searchInDescription) {
-          url += `&searchInDescription=true`;
         }
 
         setDebugRequest(url);

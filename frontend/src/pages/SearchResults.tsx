@@ -62,7 +62,6 @@ export const SearchResults: React.FC = () => {
   const [sortParam, setSortParam] = useState<string>('');
   const [filterParam, setFilterParam] = useState<string>('');
   const [categoryIds, setCategoryIds] = useState<string>('');
-  const [searchInDescription, setSearchInDescription] = useState<boolean>(false);
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -257,9 +256,12 @@ export const SearchResults: React.FC = () => {
         if (tempSearch.freeReturns) {
           filters.push('freeReturns:true');
         }
+
+        if (tempSearch.searchInDescription) {
+          filters.push('searchInDescription:true');
+        }
         
         setFilterParam(filters.join(','));
-        setSearchInDescription(tempSearch.searchInDescription || false);
         
         // Set category IDs
         if (tempSearch.categories && Array.isArray(tempSearch.categories)) {
@@ -305,7 +307,6 @@ export const SearchResults: React.FC = () => {
         // Build filter string
         const filterValue = buildFilterString(search);
         setFilterParam(filterValue);
-        setSearchInDescription(search.searchInDescription || false);
         
         // Parse and set category IDs
         if (search.categories) {
@@ -353,9 +354,6 @@ export const SearchResults: React.FC = () => {
         }
         if (categoryIds) {
           url += `&category_ids=${encodeURIComponent(categoryIds)}`;
-        }
-        if (searchInDescription) {
-          url += `&searchInDescription=true`;
         }
 
         const response = await fetch(url);
