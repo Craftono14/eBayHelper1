@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import categoriesData from '../data/ebay-categories.json';
 
 interface ItemSummary {
   itemId: string;
@@ -30,21 +29,29 @@ interface SearchResponse {
   limit: number;
 }
 
-interface Category {
+interface CategoryNode {
   id: string;
   name: string;
-  subcategories: Subcategory[];
+  children?: CategoryNode[];
 }
 
-interface Subcategory {
-  id: string;
-  name: string;
-  subsubcategories: SubSubcategory[];
+interface ListingTypeOption {
+  value: string;
+  label: string;
 }
 
-interface SubSubcategory {
-  id: string;
-  name: string;
+interface SortOption {
+  value: string;
+  label: string;
+}
+
+interface CategoryConfig {
+  categories: CategoryNode[];
+  conditions: string[];
+  itemLocations: string[];
+  listingTypes: ListingTypeOption[];
+  currencies: string[];
+  sortOptions: SortOption[];
 }
 
 export const Search: React.FC = () => {
@@ -70,19 +77,111 @@ export const Search: React.FC = () => {
   const [sortBy, setSortBy] = useState('BestMatch');
 
   // UI state
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
-  const [expandedSubcategory, setExpandedSubcategory] = useState<string | null>(null);
+  const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [total, setTotal] = useState(0);
+  const [categoryConfig, setCategoryConfig] = useState<CategoryConfig>({
+    categories: [],
+    conditions: ['New', 'Refurbished', 'Used', 'For parts or not working'],
+    itemLocations: ['US', 'Canada', 'UK', 'Australia', 'Germany', 'France', 'All Locations'],
+    listingTypes: [
+      { value: 'Buy It Now', label: 'Buy It Now' },
+      { value: 'Auction', label: 'Auction' },
+      { value: 'Both', label: 'Buy It Now & Auction' },
+    ],
+    currencies: ['USD', 'GBP', 'EUR', 'CAD', 'AUD', 'JPY', 'CNY'],
+    sortOptions: [
+      { value: 'BestMatch', label: 'Best Match' },
+      { value: 'EndTime', label: 'Ending Soon' },
+      { value: 'NewlyListed', label: 'Newly Listed' },
+      { value: 'PriceLowest', label: 'Price: Lowest First' },
+      { value: 'PriceHighest', label: 'Price: Highest First' },
+      { value: 'PricePlusShipping', label: 'Price + Shipping' },
+    ],
+  });
 
-  const categories: Category[] = categoriesData.categories;
-  const conditions = categoriesData.conditions;
-  const itemLocations = categoriesData.itemLocations;
-  const listingTypes = categoriesData.listingTypes;
-  const currencies = categoriesData.currencies;
-  const sortOptions = categoriesData.sortOptions;
+  const categories = categoryConfig.categories;
+  const conditions = categoryConfig.conditions;
+  const itemLocations = categoryConfig.itemLocations;
+  const listingTypes = categoryConfig.listingTypes;
+  const currencies = categoryConfig.currencies;
+  const sortOptions = categoryConfig.sortOptions;
+
+  useEffect(() => {
+    const loadCategoryConfig = async () => {
+      try {
+        const response = await fetch('/ebay-categories.json');
+        if (!response.ok) {
+          throw new Error('Failed to load eBay category structure');
+        }
+        const data: CategoryConfig = await response.json();
+        setCategoryConfig(data);
+      } catch (loadError) {
+        console.error('[Search] Failed to load category structure:', loadError);
+      }
+    };
+
+    loadCategoryConfig();
+  }, []);
+
+  const toggleCategorySelection = (categoryId: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
+  const toggleNodeExpanded = (nodeKey: string) => {
+    setExpandedNodes((prev) =>
+      prev.includes(nodeKey)
+        ? prev.filter((key) => key !== nodeKey)
+        : [...prev, nodeKey]
+    );
+  };
+
+  const renderCategoryNode = (node: CategoryNode, depth = 0, path = ''): React.ReactNode => {
+    const nodeKey = path ? `${path}>${node.id}` : node.id;
+    const hasChildren = (node.children?.length || 0) > 0;
+    const isExpanded = expandedNodes.includes(nodeKey);
+
+    return (
+      <div key={nodeKey} className="space-y-1">
+        <div className="flex items-center" style={{ paddingLeft: `${depth * 16}px` }}>
+          <input
+            type="checkbox"
+            id={`cat-${nodeKey}`}
+            checked={selectedCategories.includes(node.id)}
+            onChange={() => toggleCategorySelection(node.id)}
+            className="w-4 h-4 rounded"
+          />
+          <label
+            htmlFor={`cat-${nodeKey}`}
+            className={`ml-3 cursor-pointer flex-1 ${depth === 0 ? 'font-semibold' : ''}`}
+          >
+            {node.name}
+          </label>
+
+          {hasChildren && (
+            <button
+              onClick={() => toggleNodeExpanded(nodeKey)}
+              className="text-blue-600 hover:text-blue-800 text-sm"
+            >
+              {isExpanded ? '▼' : '▶'} Show
+            </button>
+          )}
+        </div>
+
+        {hasChildren && isExpanded && (
+          <div className="space-y-1">
+            {node.children?.map((child) => renderCategoryNode(child, depth + 1, nodeKey))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const mapSortToBrowseAPI = (savedSearchSort: string): string => {
     const sortMap: Record<string, string> = {
@@ -319,127 +418,7 @@ export const Search: React.FC = () => {
           <div>
             <label className="block text-lg font-semibold mb-3">Categories</label>
             <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-300 rounded-lg p-4">
-              {categories.map((category) => (
-                <div key={category.id} className="space-y-1">
-                  {/* Main Category */}
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id={`cat-${category.id}`}
-                      checked={selectedCategories.includes(category.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedCategories([...selectedCategories, category.id]);
-                        } else {
-                          setSelectedCategories(
-                            selectedCategories.filter((c) => c !== category.id)
-                          );
-                        }
-                      }}
-                      className="w-4 h-4 rounded"
-                    />
-                    <label
-                      htmlFor={`cat-${category.id}`}
-                      className="ml-3 font-semibold cursor-pointer flex-1"
-                    >
-                      {category.name}
-                    </label>
-                    {category.subcategories.length > 0 && (
-                      <button
-                        onClick={() =>
-                          setExpandedCategory(
-                            expandedCategory === category.id ? null : category.id
-                          )
-                        }
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        {expandedCategory === category.id ? '▼' : '▶'} Show
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Subcategories */}
-                  {expandedCategory === category.id && (
-                    <div className="ml-6 space-y-1">
-                      {category.subcategories.map((subcat) => (
-                        <div key={subcat.id} className="space-y-1">
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id={`subcat-${subcat.id}`}
-                              checked={selectedCategories.includes(subcat.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedCategories([...selectedCategories, subcat.id]);
-                                } else {
-                                  setSelectedCategories(
-                                    selectedCategories.filter((c) => c !== subcat.id)
-                                  );
-                                }
-                              }}
-                              className="w-4 h-4 rounded"
-                            />
-                            <label
-                              htmlFor={`subcat-${subcat.id}`}
-                              className="ml-3 cursor-pointer flex-1"
-                            >
-                              {subcat.name}
-                            </label>
-                            {subcat.subsubcategories.length > 0 && (
-                              <button
-                                onClick={() =>
-                                  setExpandedSubcategory(
-                                    expandedSubcategory === subcat.id ? null : subcat.id
-                                  )
-                                }
-                                className="text-blue-600 hover:text-blue-800 text-sm"
-                              >
-                                {expandedSubcategory === subcat.id ? '▼' : '▶'} Show
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Sub-subcategories */}
-                          {expandedSubcategory === subcat.id && (
-                            <div className="ml-6 space-y-1">
-                              {subcat.subsubcategories.map((subsubcat) => (
-                                <div key={subsubcat.id} className="flex items-center">
-                                  <input
-                                    type="checkbox"
-                                    id={`subsubcat-${subsubcat.id}`}
-                                    checked={selectedCategories.includes(subsubcat.id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedCategories([
-                                          ...selectedCategories,
-                                          subsubcat.id,
-                                        ]);
-                                      } else {
-                                        setSelectedCategories(
-                                          selectedCategories.filter(
-                                            (c) => c !== subsubcat.id
-                                          )
-                                        );
-                                      }
-                                    }}
-                                    className="w-4 h-4 rounded"
-                                  />
-                                  <label
-                                    htmlFor={`subsubcat-${subsubcat.id}`}
-                                    className="ml-3 cursor-pointer text-sm"
-                                  >
-                                    {subsubcat.name}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {categories.map((category) => renderCategoryNode(category))}
             </div>
             {selectedCategories.length > 0 && (
               <p className="text-sm text-gray-600 mt-2">
