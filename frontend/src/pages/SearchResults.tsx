@@ -12,6 +12,10 @@ interface ItemSummary {
     value: string;
     currency: string;
   };
+  currentBidPrice?: {
+    value: string;
+    currency: string;
+  };
   buyingOptions: string[];
   shippingOptions?: Array<{
     shippingCost: {
@@ -45,6 +49,7 @@ interface SavedSearchDetails {
   freeShipping?: boolean;
   returnsAccepted?: boolean;
   freeReturns?: boolean;
+  searchInDescription?: boolean;
 }
 
 export const SearchResults: React.FC = () => {
@@ -57,6 +62,7 @@ export const SearchResults: React.FC = () => {
   const [sortParam, setSortParam] = useState<string>('');
   const [filterParam, setFilterParam] = useState<string>('');
   const [categoryIds, setCategoryIds] = useState<string>('');
+  const [searchInDescription, setSearchInDescription] = useState<boolean>(false);
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -253,6 +259,7 @@ export const SearchResults: React.FC = () => {
         }
         
         setFilterParam(filters.join(','));
+        setSearchInDescription(tempSearch.searchInDescription || false);
         
         // Set category IDs
         if (tempSearch.categories && Array.isArray(tempSearch.categories)) {
@@ -298,6 +305,7 @@ export const SearchResults: React.FC = () => {
         // Build filter string
         const filterValue = buildFilterString(search);
         setFilterParam(filterValue);
+        setSearchInDescription(search.searchInDescription || false);
         
         // Parse and set category IDs
         if (search.categories) {
@@ -345,6 +353,9 @@ export const SearchResults: React.FC = () => {
         }
         if (categoryIds) {
           url += `&category_ids=${encodeURIComponent(categoryIds)}`;
+        }
+        if (searchInDescription) {
+          url += `&searchInDescription=true`;
         }
 
         const response = await fetch(url);
@@ -460,7 +471,11 @@ export const SearchResults: React.FC = () => {
           <div className="grid grid-cols-5 gap-6 mb-8">
             {items.filter(item => item?.itemId).map((item) => {
               try {
-                const price = item.price?.value ? parseFloat(item.price.value).toFixed(2) : 'N/A';
+                const isAuction = item.buyingOptions?.includes('AUCTION');
+                const displayPriceValue = isAuction && item.currentBidPrice?.value
+                  ? item.currentBidPrice.value
+                  : item.price?.value;
+                const price = displayPriceValue ? parseFloat(displayPriceValue).toFixed(2) : 'N/A';
                 const currency = item.price?.currency || 'USD';
                 
                 return (

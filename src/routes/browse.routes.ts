@@ -25,6 +25,10 @@ interface ItemSummary {
     value: string;
     currency: string;
   };
+  currentBidPrice?: {
+    value: string;
+    currency: string;
+  };
   buyingOptions: string[];
   shippingOptions?: Array<{
     shippingCost: {
@@ -68,14 +72,14 @@ async function getEbayAppToken(): Promise<string> {
  */
 router.get('/search', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { q, limit = '50', offset = '0', sort, filter, category_ids } = req.query;
+    const { q, limit = '50', offset = '0', sort, filter, category_ids, searchInDescription } = req.query;
 
     if (!q || typeof q !== 'string') {
       res.status(400).json({ error: 'Missing required query parameter: q' });
       return;
     }
 
-    console.log('[browse] Search request:', { q, limit, offset, sort, filter, category_ids });
+    console.log('[browse] Search request:', { q, limit, offset, sort, filter, category_ids, searchInDescription });
 
     // Get app token for Browse API access
     const accessToken = await getEbayAppToken();
@@ -88,6 +92,7 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
       q: q.toString(),
       limit: Math.min(parseInt(limit as string) || 50, 200).toString(),
       offset: offset.toString(),
+      fieldgroups: 'EXTENDED',
     };
 
     // Add sort parameter if provided
@@ -106,6 +111,12 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
     if (category_ids) {
       params.category_ids = category_ids.toString();
       console.log('[browse] Applied category_ids:', category_ids);
+    }
+
+    // Add searchInDescription parameter if provided
+    if (searchInDescription === 'true') {
+      params.searchInDescription = 'true';
+      console.log('[browse] Applied searchInDescription: true');
     }
 
     const response = await axios.get(browseUrl, {
@@ -133,6 +144,7 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
         title: item.title,
         image: item.image,
         price: item.price,
+        currentBidPrice: item.currentBidPrice,
         buyingOptions: item.buyingOptions || [],
         shippingOptions: item.shippingOptions,
         itemWebUrl: item.itemWebUrl,

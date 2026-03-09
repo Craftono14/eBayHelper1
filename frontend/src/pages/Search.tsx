@@ -12,6 +12,10 @@ interface ItemSummary {
     value: string;
     currency: string;
   };
+  currentBidPrice?: {
+    value: string;
+    currency: string;
+  };
   buyingOptions: string[];
   shippingOptions?: Array<{
     shippingCost?: {
@@ -340,6 +344,9 @@ export const Search: React.FC = () => {
         if (filters.categories.length === 1) {
           url += `&category_ids=${encodeURIComponent(filters.categories[0])}`;
         }
+        if (filters.searchInDescription) {
+          url += `&searchInDescription=true`;
+        }
 
         setDebugRequest(url);
 
@@ -366,6 +373,7 @@ export const Search: React.FC = () => {
             freeShipping: filters.freeShipping,
             returnsAccepted: filters.returnsAccepted,
             freeReturns: filters.freeReturns,
+            searchInDescription: filters.searchInDescription,
             currency: filters.currency,
             sortBy: filters.sortBy,
             sortOrder: filters.sortOrder,
@@ -704,7 +712,11 @@ export const Search: React.FC = () => {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
             {items.filter((item) => item?.itemId).map((item) => {
-              const price = item.price?.value ? parseFloat(item.price.value).toFixed(2) : 'N/A';
+              const isAuction = item.buyingOptions?.includes('AUCTION');
+              const displayPriceValue = isAuction && item.currentBidPrice?.value
+                ? item.currentBidPrice.value
+                : item.price?.value;
+              const displayPrice = displayPriceValue ? parseFloat(displayPriceValue).toFixed(2) : 'N/A';
 
               return (
                 <a
@@ -734,7 +746,7 @@ export const Search: React.FC = () => {
                     <div className="flex-1" />
 
                     <p className="text-lg font-bold text-blue-600 mb-2">
-                      {price === 'N/A' ? 'Price N/A' : `$${price}`}
+                      {displayPrice === 'N/A' ? 'Price N/A' : `$${displayPrice}`}
                     </p>
 
                     <p className="text-xs text-gray-600 mb-2">
