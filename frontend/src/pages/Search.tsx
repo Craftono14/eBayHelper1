@@ -58,8 +58,7 @@ interface CategoryConfig {
 }
 
 export const Search: React.FC = () => {
-  const { isLoggedIn } = useAuth();
-  const token = localStorage.getItem('token');
+  const { isLoggedIn, user } = useAuth();
 
   // Form state
   const [searchKeywords, setSearchKeywords] = useState('');
@@ -507,7 +506,7 @@ export const Search: React.FC = () => {
       // Check if a search with this name already exists
       const listResponse = await fetch('/api/search/saved', {
         headers: {
-          'x-user-id': token || '0',
+            'x-user-id': user?.id || '0',
         },
       });
 
@@ -524,7 +523,7 @@ export const Search: React.FC = () => {
         response = await fetch(`/api/search/saved/${existingSearch.id}`, {
           method: 'PUT',
           headers: {
-            'x-user-id': token || '0',
+              'x-user-id': user?.id || '0',
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -537,7 +536,7 @@ export const Search: React.FC = () => {
         response = await fetch('/api/search/saved', {
           method: 'POST',
           headers: {
-            'x-user-id': token || '0',
+              'x-user-id': user?.id || '0',
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
