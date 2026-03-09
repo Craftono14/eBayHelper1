@@ -107,6 +107,35 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<any
   }
 });
 
+// DELETE /api/searches/:id - Delete a specific saved search
+router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<any> => {
+  try {
+    const userId = (req as any).user?.id;
+    const searchId = parseInt(req.params.id);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (Number.isNaN(searchId)) {
+      return res.status(400).json({ error: 'Invalid search id' });
+    }
+
+    const deleted = await (prisma.savedSearch as any).deleteMany({
+      where: { id: searchId, userId },
+    });
+
+    if (!deleted || deleted.count === 0) {
+      return res.status(404).json({ error: 'Search not found' });
+    }
+
+    return res.json({ message: 'Search deleted successfully', id: searchId });
+  } catch (error) {
+    console.error('[searches] delete error', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/searches/import-ebay - Sync user's eBay saved searches
 router.post('/import-ebay', requireAuth, async (req: Request, res: Response): Promise<any> => {
   try {

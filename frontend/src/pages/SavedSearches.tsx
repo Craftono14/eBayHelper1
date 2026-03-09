@@ -21,6 +21,7 @@ export const SavedSearches: React.FC = () => {
   const [error, setError] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
+  const [deleteMessage, setDeleteMessage] = useState('');
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -120,6 +121,36 @@ export const SavedSearches: React.FC = () => {
     }
   };
 
+  const handleDeleteSearch = async (searchId: number) => {
+    const confirmDelete = window.confirm('Delete this saved search? This action cannot be undone.');
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      setError('');
+      setDeleteMessage('');
+      const token = localStorage.getItem('token');
+
+      const response = await fetch(`/api/searches/${searchId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete search');
+      }
+
+      setSearches((current) => current.filter((search) => search.id !== searchId));
+      setDeleteMessage('Search deleted successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete search');
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="text-center py-16">
@@ -158,6 +189,12 @@ export const SavedSearches: React.FC = () => {
       {syncMessage && (
         <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
           {syncMessage}
+        </div>
+      )}
+
+      {deleteMessage && (
+        <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
+          {deleteMessage}
         </div>
       )}
 
@@ -273,7 +310,7 @@ export const SavedSearches: React.FC = () => {
                       Edit
                     </button>
                     <button
-                      onClick={() => {/* TODO: Implement delete functionality */}}
+                      onClick={() => handleDeleteSearch(search.id)}
                       className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition"
                     >
                       Delete
