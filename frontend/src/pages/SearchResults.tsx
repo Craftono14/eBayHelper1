@@ -123,6 +123,9 @@ export const SearchResults: React.FC = () => {
     const filters: string[] = [];
 
     // Price range filter
+    const hasPriceFilter = (search.minPrice !== null && search.minPrice !== undefined) || 
+                          (search.maxPrice !== null && search.maxPrice !== undefined);
+    
     if (search.minPrice !== null && search.minPrice !== undefined && 
         search.maxPrice !== null && search.maxPrice !== undefined) {
       filters.push(`price:[${search.minPrice}..${search.maxPrice}]`);
@@ -132,8 +135,8 @@ export const SearchResults: React.FC = () => {
       filters.push(`price:[..${search.maxPrice}]`);
     }
 
-    // Currency filter
-    if (search.currency) {
+    // Currency filter (can only be used when there's a price filter)
+    if (search.currency && hasPriceFilter) {
       filters.push(`priceCurrency:${search.currency}`);
     }
 
@@ -206,12 +209,20 @@ export const SearchResults: React.FC = () => {
         // Build filter string from temporary search
         const filters: string[] = [];
         
+        const hasPriceFilter = (tempSearch.minPrice && tempSearch.minPrice !== null) || 
+                              (tempSearch.maxPrice && tempSearch.maxPrice !== null);
+        
         if (tempSearch.minPrice && tempSearch.maxPrice) {
           filters.push(`price:[${tempSearch.minPrice}..${tempSearch.maxPrice}]`);
         } else if (tempSearch.minPrice) {
           filters.push(`price:[${tempSearch.minPrice}..]`);
         } else if (tempSearch.maxPrice) {
           filters.push(`price:[..${tempSearch.maxPrice}]`);
+        }
+
+        // Currency filter (can only be used when there's a price filter)
+        if (tempSearch.currency && hasPriceFilter) {
+          filters.push(`priceCurrency:${tempSearch.currency}`);
         }
         
         if (tempSearch.condition) {

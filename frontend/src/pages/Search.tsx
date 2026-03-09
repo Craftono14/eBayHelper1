@@ -234,6 +234,8 @@ export const Search: React.FC = () => {
   }): string => {
     const parts: string[] = [];
 
+    const hasPriceFilter = filters.minPrice !== null || filters.maxPrice !== null;
+
     if (filters.minPrice !== null && filters.maxPrice !== null) {
       parts.push(`price:[${filters.minPrice}..${filters.maxPrice}]`);
     } else if (filters.minPrice !== null) {
@@ -242,7 +244,8 @@ export const Search: React.FC = () => {
       parts.push(`price:[..${filters.maxPrice}]`);
     }
 
-    if (filters.currency) {
+    // priceCurrency can only be used when there's a price filter
+    if (filters.currency && hasPriceFilter) {
       parts.push(`priceCurrency:${filters.currency}`);
     }
 
