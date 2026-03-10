@@ -102,6 +102,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
         id: true,
         itemTitle: true,
         itemUrl: true,
+        itemImageUrl: true,
         currentPrice: true,
         targetPrice: true,
         targetPriceSetManually: true,
@@ -168,6 +169,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
             itemName: item.itemTitle || 'Unknown Item',
             currentPrice,
             itemUrl,
+            imageUrl: item.itemImageUrl,
           });
 
           if (!pushResult.success) {
