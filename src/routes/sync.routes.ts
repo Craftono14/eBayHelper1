@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { ebaySyncService } from '../services/ebaySync.service';
 import { sendPriceAlertDM } from '../services/discord-notification';
+import { sendPriceAlertPushover } from '../services/pushover-notification';
 import { PrismaClient } from '@prisma/client';
 
 const router = Router();
@@ -119,14 +120,19 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       const userWithDiscord = await prisma.user.findUnique({
         where: { id: userId },
         select: {
+          notificationPreference: true,
           discordId: true,
+          pushoverUserKey: true,
+          pushoverDevice: true,
           globalPriceDropPercentage: true,
         },
       });
 
+      const preference = userWithDiscord?.notificationPreference || 'DISCORD';
+
       for (const item of triggeredItems) {
-        // Send Discord notification if user has Discord ID configured
-        if (userWithDiscord?.discordId) {
+        // Send notification only through the user's selected method.
+        if (preference === 'DISCORD' && userWithDiscord?.discordId) {
           const currentPrice = Number(item.currentPrice);
           const itemUrl = item.itemUrl || 'https://ebay.com';
 
@@ -143,6 +149,23 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           if (!dmResult.success) {
             console.warn(
               `[sync] Discord DM failed for user ${userId}, item ${item.id} (${item.itemTitle || 'Unknown Item'}): ${dmResult.error || 'Unknown error'}`
+            );
+          }
+        } else if (preference === 'PUSHOVER' && userWithDiscord?.pushoverUserKey) {
+          const currentPrice = Number(item.currentPrice);
+          const itemUrl = item.itemUrl || 'https://ebay.com';
+
+          const pushResult = await sendPriceAlertPushover({
+            userKey: userWithDiscord.pushoverUserKey,
+            device: userWithDiscord.pushoverDevice,
+            itemName: item.itemTitle || 'Unknown Item',
+            currentPrice,
+            itemUrl,
+          });
+
+          if (!pushResult.success) {
+            console.warn(
+              `[sync] Pushover notification failed for user ${userId}, item ${item.id} (${item.itemTitle || 'Unknown Item'}): ${pushResult.error || 'Unknown error'}`
             );
           }
         }
