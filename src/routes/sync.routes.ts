@@ -114,6 +114,10 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       return Number.isFinite(currentPrice) && Number.isFinite(targetPrice) && currentPrice <= targetPrice;
     });
 
+    let notificationsSent = 0;
+    let notificationsFailed = 0;
+    let notificationsSkipped = 0;
+
     // Process triggered alerts: keep manual alerts, reset auto alerts with percentage if set
     if (triggeredItems.length > 0) {
       // Fetch user's Discord settings to send notifications
@@ -147,9 +151,12 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           );
 
           if (!dmResult.success) {
+            notificationsFailed += 1;
             console.warn(
               `[sync] Discord DM failed for user ${userId}, item ${item.id} (${item.itemTitle || 'Unknown Item'}): ${dmResult.error || 'Unknown error'}`
             );
+          } else {
+            notificationsSent += 1;
           }
         } else if (preference === 'PUSHOVER' && userWithDiscord?.pushoverUserKey) {
           const currentPrice = Number(item.currentPrice);
@@ -164,10 +171,18 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           });
 
           if (!pushResult.success) {
+            notificationsFailed += 1;
             console.warn(
               `[sync] Pushover notification failed for user ${userId}, item ${item.id} (${item.itemTitle || 'Unknown Item'}): ${pushResult.error || 'Unknown error'}`
             );
+          } else {
+            notificationsSent += 1;
           }
+        } else {
+          notificationsSkipped += 1;
+          console.warn(
+            `[sync] Notification skipped for user ${userId}, item ${item.id}. Preference=${preference}, discordIdConfigured=${Boolean(userWithDiscord?.discordId)}, pushoverConfigured=${Boolean(userWithDiscord?.pushoverUserKey)}`
+          );
         }
 
         // Skip manually set alerts - user needs to manually remove/edit them
@@ -200,6 +215,9 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       }
       
       console.log(`[sync] Processed ${triggeredItems.length} triggered price alerts`);
+      console.log(
+        `[sync] Notification delivery summary for user ${userId}: sent=${notificationsSent}, failed=${notificationsFailed}, skipped=${notificationsSkipped}, preference=${preference}`
+      );
     }
 
     const alertsTriggered = triggeredItems.map((item) => item.itemTitle || 'Untitled Item');
@@ -214,6 +232,11 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
         watchlistItems: watchlistCount,
         total: totalCount,
         alertsTriggered,
+        notifications: {
+          sent: notificationsSent,
+          failed: notificationsFailed,
+          skipped: notificationsSkipped,
+        },
       },
     });
   } catch (error: any) {
