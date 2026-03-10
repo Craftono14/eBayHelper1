@@ -186,14 +186,31 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           );
         }
 
-        // Always clear triggered alerts (manual or auto) to prevent repeated notifications.
-        await prisma.wishlistItem.update({
-          where: { id: item.id },
-          data: {
-            targetPrice: null,
-            targetPriceSetManually: false,
-          },
-        });
+        // Clear triggered alert to prevent repeated notifications
+        // Then recalculate auto alert if global percentage is active
+        const currentPrice = Number(item.currentPrice);
+        
+        if (globalPercentage !== null && globalPercentage > 0 && Number.isFinite(currentPrice)) {
+          // Recalculate new auto alert based on current price
+          const newTargetPrice = currentPrice * (1 - globalPercentage / 100);
+          await prisma.wishlistItem.update({
+            where: { id: item.id },
+            data: {
+              targetPrice: newTargetPrice,
+              targetPriceSetManually: false,
+            },
+          });
+          console.log(`[sync] Recalculated auto alert for item ${item.id}: $${currentPrice} -> target $${newTargetPrice.toFixed(2)}`);
+        } else {
+          // No global percentage active, just clear the alert
+          await prisma.wishlistItem.update({
+            where: { id: item.id },
+            data: {
+              targetPrice: null,
+              targetPriceSetManually: false,
+            },
+          });
+        }
       }
       
       console.log(`[sync] Processed ${triggeredItems.length} triggered price alerts`);
