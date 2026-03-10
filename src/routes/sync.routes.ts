@@ -119,7 +119,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
     let notificationsFailed = 0;
     let notificationsSkipped = 0;
 
-    // Process triggered alerts: keep manual alerts, reset auto alerts with percentage if set
+    // Process triggered alerts: send notification and then clear alert to avoid repeat spam
     if (triggeredItems.length > 0) {
       // Fetch user's Discord settings to send notifications
       const userWithDiscord = await prisma.user.findUnique({
@@ -129,7 +129,6 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           discordId: true,
           pushoverUserKey: true,
           pushoverDevice: true,
-          globalPriceDropPercentage: true,
         },
       });
 
@@ -187,33 +186,14 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
           );
         }
 
-        // Skip manually set alerts - user needs to manually remove/edit them
-        if (item.targetPriceSetManually) {
-          continue;
-        }
-
-        const currentPrice = parseFloat(item.currentPrice!.toString());
-        
-        if (globalPercentage !== null && globalPercentage > 0) {
-          // Reapply percentage based on new current price for auto alerts
-          const newTarget = currentPrice * (1 - globalPercentage / 100);
-          await prisma.wishlistItem.update({
-            where: { id: item.id },
-            data: {
-              targetPrice: newTarget,
-              targetPriceSetManually: false,
-            },
-          });
-        } else {
-          // No global percentage, just clear the auto alert
-          await prisma.wishlistItem.update({
-            where: { id: item.id },
-            data: {
-              targetPrice: null,
-              targetPriceSetManually: false,
-            },
-          });
-        }
+        // Always clear triggered alerts (manual or auto) to prevent repeated notifications.
+        await prisma.wishlistItem.update({
+          where: { id: item.id },
+          data: {
+            targetPrice: null,
+            targetPriceSetManually: false,
+          },
+        });
       }
       
       console.log(`[sync] Processed ${triggeredItems.length} triggered price alerts`);
