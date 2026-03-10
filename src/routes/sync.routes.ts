@@ -54,26 +54,23 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
       ? parseFloat(user.globalPriceDropPercentage.toString())
       : null;
 
-    // Apply global percentage to items without manual alerts
+    // Apply global percentage only to items that don't have a targetPrice yet
+    // This prevents overwriting existing auto-alerts before they can trigger
     if (globalPercentage !== null && globalPercentage > 0) {
-      const itemsWithoutManualAlerts = await prisma.wishlistItem.findMany({
+      const itemsWithoutAlerts = await prisma.wishlistItem.findMany({
         where: {
           userId,
           isEbayImported: true,
           currentPrice: { not: null },
-          AND: [
-            { targetPriceSetManually: false }, // Only auto-set or no alerts
-          ],
+          targetPrice: null, // Only items without any alert set
         },
         select: {
           id: true,
           currentPrice: true,
-          targetPrice: true,
-          targetPriceSetManually: true,
         },
       });
 
-      for (const item of itemsWithoutManualAlerts) {
+      for (const item of itemsWithoutAlerts) {
         const currentPrice = parseFloat(item.currentPrice!.toString());
         const calculatedTarget = currentPrice * (1 - globalPercentage / 100);
 
@@ -86,7 +83,7 @@ router.post('/ebay', requireAuth, async (req: Request, res: Response): Promise<a
         });
       }
 
-      console.log(`[sync] Applied global percentage (${globalPercentage}%) to ${itemsWithoutManualAlerts.length} items`);
+      console.log(`[sync] Applied global percentage (${globalPercentage}%) to ${itemsWithoutAlerts.length} new items`);
     }
 
     // Find any price alerts that were triggered by this sync run.
