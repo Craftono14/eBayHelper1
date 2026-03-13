@@ -20,6 +20,8 @@ export interface SearchItemsOptions {
   limit?: number;
   offset?: number;
   filter?: string;
+  sort?: string;
+  categoryIds?: string;
 }
 
 export interface EbayItem {
@@ -274,6 +276,16 @@ export class EbayBrowseService {
       if (options.filter) {
         params.append('filter', options.filter);
       }
+
+      if (options.sort) {
+        params.append('sort', options.sort);
+      }
+
+      if (options.categoryIds) {
+        params.append('category_ids', options.categoryIds);
+      }
+
+      params.append('fieldgroups', 'EXTENDED');
 
       console.log(
         `[searchItems] Searching for "${options.keywords}" on ${options.globalSiteId}`

@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { createEbayBrowseService, EbayBrowseService } from '../services/ebay-browse.service';
+import { createEbayBrowseService, EbayBrowseService, EbayItem } from '../services/ebay-browse.service';
 import { ebaySyncService } from '../services/ebaySync.service';
 import { sendNewItemNotificationPushover } from '../services/pushover-notification';
 import {
@@ -77,7 +77,7 @@ export class SearchWorker {
     try {
       // Fetch all active searches
       const searches = await this.prisma.savedSearch.findMany({
-        where: { isActive: true },
+        where: { isActive: true, notifyOnNewItems: true },
         include: { user: true },
         take: this.config.maxSearchesPerRun,
       });
@@ -202,7 +202,9 @@ export class SearchWorker {
   }
 
   /**
-   * Process a single search: fetch results and find new items
+   * Process a single search: fetch results and find new items.
+   * Uses the same filter/sort/category logic as the frontend SearchResults page,
+   * always overriding sort to "newlyListed" so the worker catches genuinely new listings.
    */
   private async processSearch(search: any): Promise<SearchComparisonResult> {
     const startTime = Date.now();
@@ -217,21 +219,73 @@ export class SearchWorker {
       // Update service token for this user
       this.service.updateAccessToken(search.user.ebayAccessToken);
 
-      // Build search options from saved search criteria
-      const searchOptions = this.buildSearchOptions(search);
+      // Build filter string (matches frontend SearchResults.buildFilterString exactly)
+      const filterString = this.buildFilterString(search);
 
-      // Execute search with retry logic (built into service)
+      // Parse category IDs from JSON array stored in DB (e.g. '["11450","625"]')
+      let categoryIds: string | undefined;
+      if (search.categories) {
+        try {
+          const cats: string[] = JSON.parse(search.categories);
+          if (Array.isArray(cats) && cats.length > 0) {
+            categoryIds = cats.join(',');
+          }
+        } catch {
+          // ignore malformed category JSON
+        }
+      }
+
+      // Always sort by newly listed so the worker detects freshly posted items
+      const sort = 'newlyListed';
+
+      const baseOptions = {
+        keywords: search.searchKeywords,
+        globalSiteId: 'EBAY_US',
+        limit: 100,
+        filter: filterString || undefined,
+        sort,
+      };
+
+      let allItems: EbayItem[];
+      let totalFound: number;
+
+      if (categoryIds && categoryIds.includes(',')) {
+        // Multi-category: search each category separately, then deduplicate
+        const catList = categoryIds.split(',').map((c: string) => c.trim()).filter(Boolean);
+        const seenIds = new Set<string>();
+        allItems = [];
+        totalFound = 0;
+
+        for (const catId of catList) {
+          const result = await this.service.searchItems({ ...baseOptions, categoryIds: catId });
+          totalFound += result.total || 0;
+          for (const item of result.itemSummaries || []) {
+            if (!seenIds.has(item.itemId)) {
+              seenIds.add(item.itemId);
+              allItems.push(item);
+            }
+          }
+        }
+      } else {
+        // Single category or no category
+        const result = await this.service.searchItems({
+          ...baseOptions,
+          categoryIds: categoryIds || undefined,
+        });
+        allItems = result.itemSummaries || [];
+        totalFound = result.total || 0;
+      }
+
       console.log(
-        `[searchWorker] Searching: "${search.searchKeywords}" in ${searchOptions.globalSiteId}`
+        `[searchWorker] Searching: "${search.searchKeywords}" — filter: "${filterString || 'none'}", categories: "${categoryIds || 'any'}", sort: ${sort}`
       );
-      const results = await this.service.searchItems(searchOptions);
 
       // Find new items by comparing with existing wishlist
       const newItems = await findNewItems(
         this.prisma,
         search.userId,
         search.id,
-        results.itemSummaries,
+        allItems,
         search.minPrice ? parseFloat(search.minPrice.toString()) : undefined,
         search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined
       );
@@ -258,15 +312,15 @@ export class SearchWorker {
 
       const processingTimeMs = Date.now() - startTime;
       console.log(
-        `[searchWorker] Search complete - Found: ${results.total} results, ${newItems.length} new items, ${stats.itemCount} total tracked (${processingTimeMs}ms)`
+        `[searchWorker] Search complete - Found: ${totalFound} results, ${newItems.length} new items, ${stats.itemCount} total tracked (${processingTimeMs}ms)`
       );
 
       return {
         searchId: search.id,
         searchName: search.name,
-        totalResultsFound: results.total,
+        totalResultsFound: totalFound,
         newItemsFound: newItems,
-        itemsChecked: results.itemSummaries.length,
+        itemsChecked: allItems.length,
         processingTimeMs,
       };
     } catch (error) {
@@ -285,6 +339,86 @@ export class SearchWorker {
 
       throw error;
     }
+  }
+
+  /**
+   * Build a Browse API filter string from a SavedSearch record.
+   * Logic mirrors the frontend SearchResults.buildFilterString() exactly.
+   */
+  private buildFilterString(search: any): string {
+    const filters: string[] = [];
+
+    // Price filters
+    const minPrice = search.minPrice ? parseFloat(search.minPrice.toString()) : null;
+    const maxPrice = search.maxPrice ? parseFloat(search.maxPrice.toString()) : null;
+    const hasPriceFilter = minPrice !== null || maxPrice !== null;
+
+    if (minPrice !== null && maxPrice !== null) {
+      filters.push(`price:[${minPrice}..${maxPrice}]`);
+    } else if (minPrice !== null) {
+      filters.push(`price:[${minPrice}..]`);
+    } else if (maxPrice !== null) {
+      filters.push(`price:[..${maxPrice}]`);
+    }
+
+    // Currency (required alongside a price filter)
+    if (hasPriceFilter && search.currency) {
+      filters.push(`priceCurrency:${search.currency}`);
+    }
+
+    // Condition
+    if (search.condition) {
+      const conditionMap: Record<string, string> = {
+        'New': 'NEW',
+        'Used': 'USED',
+        'Refurbished': 'REFURBISHED',
+        'For parts or not working': 'FOR_PARTS_OR_NOT_WORKING',
+      };
+      const browseCondition = conditionMap[search.condition] || search.condition.toUpperCase().replace(/ /g, '_');
+      filters.push(`conditions:{${browseCondition}}`);
+    }
+
+    // Buying format
+    if (search.buyingFormat) {
+      const formatMap: Record<string, string> = {
+        'Auction': 'AUCTION',
+        'Buy It Now': 'FIXED_PRICE',
+        'FixItPrice': 'FIXED_PRICE',
+        'AuctionWithBIN': 'AUCTION|FIXED_PRICE',
+        'Both': 'AUCTION|FIXED_PRICE',
+      };
+      const browseFormat = formatMap[search.buyingFormat] || 'FIXED_PRICE';
+      filters.push(`buyingOptions:{${browseFormat}}`);
+    }
+
+    // Shipping/returns
+    if (search.freeShipping) {
+      filters.push('maxDeliveryCost:0');
+    }
+    if (search.returnsAccepted) {
+      filters.push('returnsAccepted:true');
+    }
+    if (search.freeReturns) {
+      filters.push('freeReturns:true');
+    }
+
+    // Search in description
+    if (search.searchInDescription) {
+      filters.push('searchInDescription:true');
+    }
+
+    // Item location
+    if (search.itemLocation && search.itemLocation !== 'Default') {
+      if (search.itemLocation === 'US Only') {
+        filters.push('itemLocationCountry:US');
+      } else if (search.itemLocation === 'North America') {
+        filters.push('itemLocationRegion:NORTH_AMERICA');
+      } else if (search.itemLocation === 'Worldwide') {
+        filters.push('itemLocationRegion:WORLDWIDE');
+      }
+    }
+
+    return filters.join(',');
   }
 
   /**
@@ -343,38 +477,6 @@ export class SearchWorker {
         `[searchWorker] Pushover notification sent for user ${user.id} / search "${search.name}" (${newItems.length} new item(s))`
       );
     }
-  }
-
-  /**
-   * Build search options from SavedSearch database record
-   */
-  private buildSearchOptions(search: any): any {
-    const options: any = {
-      keywords: search.searchKeywords,
-      globalSiteId: 'EBAY_US', // Default, could be stored in SavedSearch
-      limit: 100,
-    };
-
-    // Add filters from saved search criteria
-    if (search.condition) {
-      options.filter = { condition: search.condition };
-    }
-
-    if (search.freeShipping) {
-      options.filter = { ...options.filter, freeShippingOnly: true };
-    }
-
-    if (search.minPrice || search.maxPrice) {
-      options.filter = {
-        ...options.filter,
-        priceRange: {
-          min: search.minPrice ? parseFloat(search.minPrice.toString()) : undefined,
-          max: search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined,
-        },
-      };
-    }
-
-    return options;
   }
 
   /**
