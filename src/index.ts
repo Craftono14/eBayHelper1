@@ -24,6 +24,8 @@ import { requireAuth } from './middleware/auth.middleware';
 // Load environment variables
 dotenv.config();
 let workerRouter: Router | null = null;
+let workerInitializationState: 'initializing' | 'ready' | 'failed' = 'initializing';
+let workerInitializationMessage = 'Background workers are initializing';
 
 console.log('\n═══════════════════════════════════════════════════');
 console.log('  eBay Helper Server Starting');
@@ -43,7 +45,8 @@ app.use('/api/workers', (req: Request, res: Response, next: NextFunction): void 
   if (!workerRouter) {
     res.status(503).json({
       error: 'Service Unavailable',
-      message: 'Background workers are not initialized yet',
+      state: workerInitializationState,
+      message: workerInitializationMessage,
     });
     return;
   }
@@ -261,36 +264,40 @@ const startServer = async (): Promise<void> => {
       console.log('[STARTUP] Running background initialization tasks...');
       
       // Initialize background workers
-      const accessToken = process.env.EBAY_ACCESS_TOKEN;
-      if (!accessToken) {
-        console.warn('  ⚠️  EBAY_ACCESS_TOKEN not set - background workers disabled');
-      } else {
-        try {
-          console.log('  → Initializing background workers...');
-          const { router: initializedWorkerRouter, cleanup: workerCleanup } = await initializeWorkers(
-            app,
-            prisma,
-            accessToken,
-            {
-              useBullMQ: process.env.USE_BULLMQ === 'true',
-              cronSchedule: process.env.WORKER_SCHEDULE || '*/5 * * * *',
-              sandbox: process.env.EBAY_SANDBOX === 'true',
-              redisUrl: process.env.REDIS_URL,
-            }
-          );
-
-          workerRouter = initializedWorkerRouter;
-          console.log('  ✓ Background workers initialized');
-
-          if (workerCleanup) {
-            process.on('SIGINT', async () => {
-              console.log('Cleaning up workers...');
-              await workerCleanup();
-            });
-          }
-        } catch (error) {
-          console.error('  ✗ Worker initialization failed:', error instanceof Error ? error.message : String(error));
+      const accessToken = process.env.EBAY_ACCESS_TOKEN || '';
+      try {
+        if (!accessToken) {
+          console.warn('  ⚠️  EBAY_ACCESS_TOKEN not set - continuing worker startup with per-user OAuth tokens only');
         }
+
+        console.log('  → Initializing background workers...');
+        const { router: initializedWorkerRouter, cleanup: workerCleanup } = await initializeWorkers(
+          app,
+          prisma,
+          accessToken,
+          {
+            useBullMQ: process.env.USE_BULLMQ === 'true',
+            cronSchedule: process.env.WORKER_SCHEDULE || '*/5 * * * *',
+            sandbox: process.env.EBAY_SANDBOX === 'true',
+            redisUrl: process.env.REDIS_URL,
+          }
+        );
+
+        workerRouter = initializedWorkerRouter;
+        workerInitializationState = 'ready';
+        workerInitializationMessage = 'Background workers are ready';
+        console.log('  ✓ Background workers initialized');
+
+        if (workerCleanup) {
+          process.on('SIGINT', async () => {
+            console.log('Cleaning up workers...');
+            await workerCleanup();
+          });
+        }
+      } catch (error) {
+        workerInitializationState = 'failed';
+        workerInitializationMessage = error instanceof Error ? error.message : String(error);
+        console.error('  ✗ Worker initialization failed:', workerInitializationMessage);
       }
 
       console.log('[STARTUP] Background initialization complete');
