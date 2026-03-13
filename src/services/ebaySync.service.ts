@@ -8,6 +8,7 @@ import axios from 'axios';
 import {
   EbayOAuthConfig,
   OAuthTokens,
+  isTokenExpired,
   refreshAccessToken,
 } from '../utils/ebayOAuth';
 
@@ -60,6 +61,56 @@ interface EbayWatchlistItem {
  */
 export class EbaySyncService {
   /**
+   * Ensure user has a valid access token before calling eBay APIs.
+   * Refreshes automatically if token is expired (or near expiry) and refresh token exists.
+   */
+  private async getValidUserTokens(userId: number): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiry?: Date | null;
+  }> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        ebayAccessToken: true,
+        ebayRefreshToken: true,
+        ebayTokenExpiry: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error(`User ${userId} not found`);
+    }
+
+    if (!user.ebayAccessToken) {
+      throw new Error(`User ${userId} does not have an eBay access token`);
+    }
+
+    const shouldRefresh =
+      !!user.ebayRefreshToken &&
+      (!!user.ebayTokenExpiry ? isTokenExpired(user.ebayTokenExpiry) : false);
+
+    if (!shouldRefresh) {
+      return {
+        accessToken: user.ebayAccessToken,
+        refreshToken: user.ebayRefreshToken || undefined,
+        expiry: user.ebayTokenExpiry,
+      };
+    }
+
+    console.log(`[EbaySyncService] Access token near/at expiry for user ${userId}, refreshing...`);
+
+    const newTokens = await refreshAccessToken(user.ebayRefreshToken!, ebayConfig);
+    await this.updateUserTokens(userId, newTokens);
+
+    return {
+      accessToken: newTokens.accessToken,
+      refreshToken: newTokens.refreshToken,
+      expiry: newTokens.expiresAt,
+    };
+  }
+
+  /**
    * Sync saved searches from eBay to local database
    * Uses eBay Trading API GetMyeBayBuying with FavoriteSearches container
    * @returns Number of saved searches synced
@@ -68,23 +119,7 @@ export class EbaySyncService {
     try {
       console.log(`[EbaySyncService] Syncing saved searches for user ${userId}`);
 
-      // Get user with eBay tokens
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          ebayAccessToken: true,
-          ebayRefreshToken: true,
-          ebayTokenExpiry: true,
-        },
-      });
-
-      if (!user) {
-        throw new Error(`User ${userId} not found`);
-      }
-
-      if (!user.ebayAccessToken) {
-        throw new Error(`User ${userId} does not have an eBay access token`);
-      }
+      const userTokens = await this.getValidUserTokens(userId);
 
       // Trading API endpoint
       const apiUrl = ebayConfig.sandbox
@@ -95,7 +130,7 @@ export class EbaySyncService {
       const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBayBuyingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
-    <eBayAuthToken>${user.ebayAccessToken}</eBayAuthToken>
+    <eBayAuthToken>${userTokens.accessToken}</eBayAuthToken>
   </RequesterCredentials>
   <FavoriteSearches>
     <Include>true</Include>
@@ -200,11 +235,11 @@ export class EbaySyncService {
         return syncedCount;
       } catch (error: any) {
         // Handle 401 - attempt token refresh
-        if (error.response?.status === 401 && user.ebayRefreshToken) {
+        if (error.response?.status === 401 && userTokens.refreshToken) {
           console.log('[EbaySyncService] Access token expired, attempting refresh...');
           
           try {
-            const newTokens = await refreshAccessToken(user.ebayRefreshToken, ebayConfig);
+            const newTokens = await refreshAccessToken(userTokens.refreshToken, ebayConfig);
             await this.updateUserTokens(userId, newTokens);
 
             // Retry with new token
@@ -324,23 +359,7 @@ export class EbaySyncService {
     try {
       console.log(`[EbaySyncService] Syncing watchlist for user ${userId}`);
 
-      // Get user with eBay tokens
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          ebayAccessToken: true,
-          ebayRefreshToken: true,
-          ebayTokenExpiry: true,
-        },
-      });
-
-      if (!user) {
-        throw new Error(`User ${userId} not found`);
-      }
-
-      if (!user.ebayAccessToken) {
-        throw new Error(`User ${userId} does not have an eBay access token`);
-      }
+      const userTokens = await this.getValidUserTokens(userId);
 
       // Trading API endpoint
       const apiUrl = ebayConfig.sandbox
@@ -359,7 +378,7 @@ export class EbaySyncService {
           const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBayBuyingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
-    <eBayAuthToken>${user.ebayAccessToken}</eBayAuthToken>
+    <eBayAuthToken>${userTokens.accessToken}</eBayAuthToken>
   </RequesterCredentials>
   <WatchList>
     <Include>true</Include>
@@ -403,11 +422,11 @@ export class EbaySyncService {
         console.log(`[EbaySyncService] Total watchlist items fetched: ${watchlistItems.length}`);
       } catch (error: any) {
         // Handle 401 - attempt token refresh
-        if (error.response?.status === 401 && user.ebayRefreshToken) {
+        if (error.response?.status === 401 && userTokens.refreshToken) {
           console.log('[EbaySyncService] Access token expired, attempting refresh...');
           
           try {
-            const newTokens = await refreshAccessToken(user.ebayRefreshToken, ebayConfig);
+            const newTokens = await refreshAccessToken(userTokens.refreshToken, ebayConfig);
             await this.updateUserTokens(userId, newTokens);
 
             // Retry with new token - fetch all pages

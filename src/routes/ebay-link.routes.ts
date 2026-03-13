@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth.middleware';
+import { refreshAccessToken } from '../utils/ebayOAuth';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -163,15 +164,53 @@ router.get('/status', requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const isLinked = !!user.ebayAccessToken;
-    const isExpired = user.ebayTokenExpiry ? new Date(user.ebayTokenExpiry) < new Date() : true;
+    let accessToken = user.ebayAccessToken;
+    let refreshToken = user.ebayRefreshToken;
+    let tokenExpiry = user.ebayTokenExpiry;
+
+    // Auto-refresh if expired and refresh token exists.
+    const tokenExpired = tokenExpiry ? new Date(tokenExpiry) < new Date() : true;
+    if (accessToken && refreshToken && tokenExpired && EBAY_CLIENT_ID && EBAY_CLIENT_SECRET && EBAY_OAUTH_REDIRECT_URI) {
+      try {
+        const refreshed = await refreshAccessToken(refreshToken, {
+          clientId: EBAY_CLIENT_ID,
+          clientSecret: EBAY_CLIENT_SECRET,
+          redirectUri: EBAY_OAUTH_REDIRECT_URI,
+          sandbox: EBAY_SANDBOX,
+        });
+
+        const updated = await prisma.user.update({
+          where: { id: userId },
+          data: {
+            ebayAccessToken: refreshed.accessToken,
+            ebayRefreshToken: refreshed.refreshToken || refreshToken,
+            ebayTokenExpiry: refreshed.expiresAt,
+          },
+          select: {
+            ebayAccessToken: true,
+            ebayRefreshToken: true,
+            ebayTokenExpiry: true,
+            ebayUserId: true,
+          },
+        });
+
+        accessToken = updated.ebayAccessToken;
+        refreshToken = updated.ebayRefreshToken;
+        tokenExpiry = updated.ebayTokenExpiry;
+      } catch (refreshError: any) {
+        console.warn('[ebay] status auto-refresh failed:', refreshError?.message || refreshError);
+      }
+    }
+
+    const isLinked = !!accessToken;
+    const isExpired = tokenExpiry ? new Date(tokenExpiry) < new Date() : true;
 
     return res.json({
       isLinked,
-      hasRefreshToken: !!user.ebayRefreshToken,
+      hasRefreshToken: !!refreshToken,
       isExpired,
       ebayUserId: user.ebayUserId,
-      tokenExpiry: user.ebayTokenExpiry,
+      tokenExpiry,
     });
   } catch (error) {
     console.error('[ebay] status error', error);
