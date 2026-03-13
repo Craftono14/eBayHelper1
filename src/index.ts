@@ -1,4 +1,4 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction, Router } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -17,12 +17,13 @@ import ebaySyncRoutes from './routes/ebay-sync.routes';
 import ebayAccountDeletionRoutes from './routes/ebay-account-deletion.routes';
 import syncRoutes from './routes/sync.routes';
 import usersRoutes from './routes/users.routes';
+import { initializeWorkers } from './workers/express-integration';
 import { createPriceMonitoringRouter } from './routes/prices.routes';
 import { requireAuth } from './middleware/auth.middleware';
-import { initializeWorkers, mountWorkerRoutes } from './workers/express-integration';
 
 // Load environment variables
 dotenv.config();
+let workerRouter: Router | null = null;
 
 console.log('\n═══════════════════════════════════════════════════');
 console.log('  eBay Helper Server Starting');
@@ -37,6 +38,18 @@ let prisma: PrismaClient;
 let priceRouter: ReturnType<typeof createPriceMonitoringRouter> | null = null;
 
 // Middleware
+// Worker routes are initialized asynchronously, so keep the mount point in the main routing chain.
+app.use('/api/workers', (req: Request, res: Response, next: NextFunction): void => {
+  if (!workerRouter) {
+    res.status(503).json({
+      error: 'Service Unavailable',
+      message: 'Background workers are not initialized yet',
+    });
+    return;
+  }
+
+  workerRouter(req, res, next);
+});
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -254,7 +267,7 @@ const startServer = async (): Promise<void> => {
       } else {
         try {
           console.log('  → Initializing background workers...');
-          const { router: workerRouter, cleanup: workerCleanup } = await initializeWorkers(
+          const { router: initializedWorkerRouter, cleanup: workerCleanup } = await initializeWorkers(
             app,
             prisma,
             accessToken,
@@ -266,7 +279,7 @@ const startServer = async (): Promise<void> => {
             }
           );
 
-          mountWorkerRoutes(app, workerRouter, '/api/workers');
+          workerRouter = initializedWorkerRouter;
           console.log('  ✓ Background workers initialized');
 
           if (workerCleanup) {
