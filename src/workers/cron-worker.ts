@@ -22,6 +22,7 @@ export interface CronWorkerConfig {
   sandbox?: boolean;
   cronSchedule: string; // Cron expression (e.g., "*/5 * * * *" for every 5 minutes)
   enabled: boolean;
+  autoAddSearchResultsToWishlist?: boolean;
 }
 
 /**
@@ -107,6 +108,7 @@ export class CronWorkerManager {
         maxConcurrentRequests: 3,
         delayBetweenRequestsMs: 500,
         maxSearchesPerRun: 50,
+        autoAddSearchResultsToWishlist: this.config.autoAddSearchResultsToWishlist || false,
       });
 
       const stats = await searchWorker.runSearchCycle();

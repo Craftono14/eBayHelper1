@@ -59,7 +59,8 @@ export function createBullMQWorker(
   queue: Queue<JobData>,
   prisma: PrismaClient,
   accessToken: string,
-  sandbox?: boolean
+  sandbox?: boolean,
+  autoAddSearchResultsToWishlist: boolean = false
 ): Worker<JobData> {
   const worker = new Worker<JobData>(
     queue.name,
@@ -72,6 +73,7 @@ export function createBullMQWorker(
         maxConcurrentRequests: 3,
         delayBetweenRequestsMs: 500,
         maxSearchesPerRun: 50,
+        autoAddSearchResultsToWishlist,
       });
 
       try {

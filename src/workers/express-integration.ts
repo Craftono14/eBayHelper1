@@ -34,6 +34,7 @@ export async function initializeWorkers(
   const useBullMQ = options?.useBullMQ ?? false; // Default to node-cron for simplicity
   const sandbox = options?.sandbox ?? false;
   const cronSchedule = options?.cronSchedule ?? '*/5 * * * *'; // Default: every 5 minutes
+  const autoAddSearchResultsToWishlist = process.env.WORKER_AUTO_ADD_SEARCH_RESULTS === 'true';
 
   console.log(`[workers] Initializing with ${useBullMQ ? 'BullMQ' : 'node-cron'}`);
 
@@ -45,7 +46,13 @@ export async function initializeWorkers(
     // ========================================
     try {
       const queue = createSearchQueue(options?.redisUrl);
-      const worker = createBullMQWorker(queue, prisma, accessToken, sandbox);
+      const worker = createBullMQWorker(
+        queue,
+        prisma,
+        accessToken,
+        sandbox,
+        autoAddSearchResultsToWishlist
+      );
       const queueEvents = setupQueueEventListener(queue);
 
       // Schedule periodic searches
@@ -140,6 +147,7 @@ export async function initializeWorkers(
     sandbox,
     cronSchedule,
     enabled: true,
+    autoAddSearchResultsToWishlist,
   });
 
   // Start the scheduler

@@ -19,6 +19,7 @@ export interface WorkerConfig {
   maxConcurrentRequests?: number;
   delayBetweenRequestsMs?: number;
   maxSearchesPerRun?: number;
+  autoAddSearchResultsToWishlist?: boolean;
 }
 
 export interface WorkerStats {
@@ -54,6 +55,7 @@ export class SearchWorker {
       maxConcurrentRequests: 3,
       delayBetweenRequestsMs: 500,
       maxSearchesPerRun: 50,
+      autoAddSearchResultsToWishlist: false,
       ...config,
     };
 
@@ -232,8 +234,9 @@ export class SearchWorker {
         search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined
       );
 
-      // Save new items to database
-      if (newItems.length > 0) {
+      // Optional behavior: only auto-add search results if explicitly enabled.
+      // Default is false to prevent feed/discovery results from flooding wishlist.
+      if (this.config.autoAddSearchResultsToWishlist && newItems.length > 0) {
         await saveNewItems(this.prisma, search.userId, search.id, newItems);
       }
 
