@@ -127,6 +127,7 @@ export const Wishlist: React.FC = () => {
 
   const handleDelete = async (item: WishlistItem) => {
     if (item.isEbayImported) {
+      setError('This item is synced from your eBay watchlist. Remove it on eBay, then run sync.');
       return;
     }
 
@@ -589,6 +590,7 @@ export const Wishlist: React.FC = () => {
                   <button
                     onClick={() => handleDelete(item)}
                     disabled={item.isEbayImported}
+                    title={item.isEbayImported ? 'Synced eBay item: remove on eBay first' : 'Delete this item'}
                     className={`px-3 py-2 rounded-lg font-medium text-sm transition ${
                       item.isEbayImported
                         ? 'bg-gray-300 text-gray-600 cursor-not-allowed'

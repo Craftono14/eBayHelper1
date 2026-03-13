@@ -480,10 +480,9 @@ router.delete('/wishlist/:id', requireAuth, async (req: Request, res: Response):
       return;
     }
 
-    // Mark as inactive (soft delete for history)
-    await prisma.wishlistItem.update({
+    // Hard delete so the item is removed from all filters immediately.
+    await prisma.wishlistItem.delete({
       where: { id: itemId },
-      data: { isActive: false },
     });
 
     res.json({ message: 'Item removed from wishlist' });
