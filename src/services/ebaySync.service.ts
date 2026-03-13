@@ -5,6 +5,8 @@
 
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
+import { sendPriceAlertDM } from './discord-notification';
+import { sendPriceAlertPushover } from './pushover-notification';
 import {
   EbayOAuthConfig,
   OAuthTokens,
@@ -56,10 +58,193 @@ interface EbayWatchlistItem {
   quantityAvailable?: number;
 }
 
+export interface UserSyncNotificationStats {
+  sent: number;
+  failed: number;
+  skipped: number;
+}
+
+export interface UserSyncResult {
+  savedSearches: number;
+  watchlistItems: number;
+  alertsTriggered: string[];
+  notifications: UserSyncNotificationStats;
+}
+
 /**
  * eBay Sync Service Class
  */
 export class EbaySyncService {
+  private async applyGlobalPercentageAlerts(userId: number, globalPercentage: number | null): Promise<void> {
+    if (globalPercentage === null || globalPercentage <= 0) {
+      return;
+    }
+
+    const itemsWithoutAlerts = await prisma.wishlistItem.findMany({
+      where: {
+        userId,
+        isEbayImported: true,
+        currentPrice: { not: null },
+        targetPrice: null,
+      },
+      select: {
+        id: true,
+        currentPrice: true,
+      },
+    });
+
+    for (const item of itemsWithoutAlerts) {
+      const currentPrice = parseFloat(item.currentPrice!.toString());
+      const calculatedTarget = currentPrice * (1 - globalPercentage / 100);
+
+      await prisma.wishlistItem.update({
+        where: { id: item.id },
+        data: {
+          targetPrice: calculatedTarget,
+          targetPriceSetManually: false,
+        },
+      });
+    }
+
+    console.log(
+      `[EbaySyncService] Applied global percentage (${globalPercentage}%) to ${itemsWithoutAlerts.length} new items for user ${userId}`
+    );
+  }
+
+  private async processTriggeredPriceAlerts(
+    userId: number,
+    syncStartedAt: Date,
+    globalPercentage: number | null
+  ): Promise<{
+    alertsTriggered: string[];
+    notifications: UserSyncNotificationStats;
+  }> {
+    const recentlySyncedItems = await prisma.wishlistItem.findMany({
+      where: {
+        userId,
+        isEbayImported: true,
+        updatedAt: { gte: syncStartedAt },
+        targetPrice: { not: null },
+        currentPrice: { not: null },
+      },
+      select: {
+        id: true,
+        itemTitle: true,
+        itemUrl: true,
+        itemImageUrl: true,
+        currentPrice: true,
+        targetPrice: true,
+        targetPriceSetManually: true,
+      },
+    });
+
+    const triggeredItems = recentlySyncedItems.filter((item) => {
+      const currentPrice = Number(item.currentPrice);
+      const targetPrice = Number(item.targetPrice);
+      return Number.isFinite(currentPrice) && Number.isFinite(targetPrice) && currentPrice <= targetPrice;
+    });
+
+    const notifications: UserSyncNotificationStats = {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+    };
+
+    if (triggeredItems.length === 0) {
+      return {
+        alertsTriggered: [],
+        notifications,
+      };
+    }
+
+    const userNotificationSettings = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        notificationPreference: true,
+        discordId: true,
+        pushoverUserKey: true,
+        pushoverDevice: true,
+      },
+    });
+
+    const preference = userNotificationSettings?.notificationPreference || 'DISCORD';
+
+    for (const item of triggeredItems) {
+      if (preference === 'DISCORD' && userNotificationSettings?.discordId) {
+        const dmResult = await sendPriceAlertDM(
+          { discordId: userNotificationSettings.discordId },
+          {
+            itemName: item.itemTitle || 'Unknown Item',
+            currentPrice: Number(item.currentPrice),
+            targetPrice: Number(item.targetPrice),
+            url: item.itemUrl || 'https://ebay.com',
+          }
+        );
+
+        if (dmResult.success) {
+          notifications.sent += 1;
+        } else {
+          notifications.failed += 1;
+          console.warn(
+            `[EbaySyncService] Discord DM failed for user ${userId}, item ${item.id}: ${dmResult.error || 'Unknown error'}`
+          );
+        }
+      } else if (preference === 'PUSHOVER' && userNotificationSettings?.pushoverUserKey) {
+        const pushResult = await sendPriceAlertPushover({
+          userKey: userNotificationSettings.pushoverUserKey,
+          device: userNotificationSettings.pushoverDevice,
+          itemName: item.itemTitle || 'Unknown Item',
+          currentPrice: Number(item.currentPrice),
+          itemUrl: item.itemUrl || 'https://ebay.com',
+          imageUrl: item.itemImageUrl,
+        });
+
+        if (pushResult.success) {
+          notifications.sent += 1;
+        } else {
+          notifications.failed += 1;
+          console.warn(
+            `[EbaySyncService] Pushover notification failed for user ${userId}, item ${item.id}: ${pushResult.error || 'Unknown error'}`
+          );
+        }
+      } else {
+        notifications.skipped += 1;
+        console.warn(
+          `[EbaySyncService] Notification skipped for user ${userId}, item ${item.id}. Preference=${preference}, discordIdConfigured=${Boolean(userNotificationSettings?.discordId)}, pushoverConfigured=${Boolean(userNotificationSettings?.pushoverUserKey)}`
+        );
+      }
+
+      const currentPrice = Number(item.currentPrice);
+      if (globalPercentage !== null && globalPercentage > 0 && Number.isFinite(currentPrice)) {
+        const newTargetPrice = currentPrice * (1 - globalPercentage / 100);
+        await prisma.wishlistItem.update({
+          where: { id: item.id },
+          data: {
+            targetPrice: newTargetPrice,
+            targetPriceSetManually: false,
+          },
+        });
+      } else {
+        await prisma.wishlistItem.update({
+          where: { id: item.id },
+          data: {
+            targetPrice: null,
+            targetPriceSetManually: false,
+          },
+        });
+      }
+    }
+
+    console.log(
+      `[EbaySyncService] Processed ${triggeredItems.length} triggered price alerts for user ${userId}: sent=${notifications.sent}, failed=${notifications.failed}, skipped=${notifications.skipped}`
+    );
+
+    return {
+      alertsTriggered: triggeredItems.map((item) => item.itemTitle || 'Untitled Item'),
+      notifications,
+    };
+  }
+
   /**
    * Ensure user has a valid access token before calling eBay APIs.
    * Refreshes automatically if token is expired (or near expiry) and refresh token exists.
@@ -838,6 +1023,53 @@ export class EbaySyncService {
     }
 
     console.log(`[EbaySyncService] Full sync completed for user ${userId}`);
+  }
+
+  /**
+   * Sync user eBay data and process any triggered price alerts.
+   */
+  async syncUserData(
+    userId: number,
+    options?: { includeSavedSearches?: boolean }
+  ): Promise<UserSyncResult> {
+    const syncStartedAt = new Date();
+    const includeSavedSearches = options?.includeSavedSearches !== false;
+
+    let savedSearches = 0;
+    let watchlistItems = 0;
+
+    if (includeSavedSearches) {
+      try {
+        savedSearches = await this.syncSavedSearches(userId);
+      } catch (error: any) {
+        console.error(`[EbaySyncService] Saved searches sync failed for user ${userId}:`, error.message);
+      }
+    }
+
+    try {
+      watchlistItems = await this.syncWishlist(userId);
+    } catch (error: any) {
+      console.error(`[EbaySyncService] Watchlist sync failed for user ${userId}:`, error.message);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { globalPriceDropPercentage: true },
+    });
+
+    const globalPercentage = user?.globalPriceDropPercentage
+      ? parseFloat(user.globalPriceDropPercentage.toString())
+      : null;
+
+    await this.applyGlobalPercentageAlerts(userId, globalPercentage);
+    const alertResults = await this.processTriggeredPriceAlerts(userId, syncStartedAt, globalPercentage);
+
+    return {
+      savedSearches,
+      watchlistItems,
+      alertsTriggered: alertResults.alertsTriggered,
+      notifications: alertResults.notifications,
+    };
   }
 }
 

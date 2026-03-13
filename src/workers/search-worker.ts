@@ -5,6 +5,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { createEbayBrowseService, EbayBrowseService } from '../services/ebay-browse.service';
+import { ebaySyncService } from '../services/ebaySync.service';
 import {
   findNewItems,
   saveNewItems,
@@ -86,6 +87,8 @@ export class SearchWorker {
       this.stats.newItemsFound = results.reduce((sum, r) => sum + r.newItemsFound.length, 0);
       this.stats.totalItemsProcessed = results.reduce((sum, r) => sum + r.totalResultsFound, 0);
 
+      await this.syncWatchlistsForPriceAlerts();
+
       console.log(
         `[searchWorker] Cycle complete - Completed: ${this.stats.completedSearches}/${this.stats.totalSearches}, New items: ${this.stats.newItemsFound}`
       );
@@ -138,6 +141,60 @@ export class SearchWorker {
     }
 
     return results;
+  }
+
+  /**
+   * Re-sync watchlists for users with active price monitoring so scheduled runs can trigger alerts.
+   */
+  private async syncWatchlistsForPriceAlerts(): Promise<void> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        ebayAccessToken: { not: null },
+        OR: [
+          {
+            globalPriceDropPercentage: { not: null },
+          },
+          {
+            wishlistItems: {
+              some: {
+                isEbayImported: true,
+                isActive: true,
+                targetPrice: { not: null },
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (users.length === 0) {
+      console.log('[searchWorker] No users require watchlist re-sync for price alerts');
+      return;
+    }
+
+    console.log(`[searchWorker] Re-syncing watchlists for ${users.length} users to evaluate price alerts`);
+
+    for (const user of users) {
+      try {
+        const result = await ebaySyncService.syncUserData(user.id, {
+          includeSavedSearches: false,
+        });
+
+        if (result.alertsTriggered.length > 0) {
+          console.log(
+            `[searchWorker] User ${user.id} triggered ${result.alertsTriggered.length} price alerts during scheduled watchlist sync`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[searchWorker] Watchlist re-sync failed for user ${user.id}:`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
   }
 
   /**
