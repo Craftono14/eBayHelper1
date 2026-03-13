@@ -25,6 +25,7 @@ router.get('/dashboard', requireAuth, async (req: Request, res: Response): Promi
       newResultsCount: 0, // TODO: Implement proper new results tracking
       isEbayImported: search.isEbayImported,
       includeInFeed: search.includeInFeed,
+      notifyOnNewItems: search.notifyOnNewItems,
       createdAt: search.createdAt,
       updatedAt: search.updatedAt,
     }));
@@ -67,6 +68,37 @@ router.patch('/:id/feed', requireAuth, async (req: Request, res: Response): Prom
   }
 });
 
+// PATCH /api/searches/:id/notifications - Toggle search notifications
+router.patch('/:id/notifications', requireAuth, async (req: Request, res: Response): Promise<any> => {
+  try {
+    const userId = (req as any).user?.id;
+    const searchId = parseInt(req.params.id);
+    const { notifyOnNewItems } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (typeof notifyOnNewItems !== 'boolean') {
+      return res.status(400).json({ error: 'notifyOnNewItems must be a boolean' });
+    }
+
+    const updated = await (prisma.savedSearch as any).updateMany({
+      where: { id: searchId, userId },
+      data: { notifyOnNewItems },
+    });
+
+    if (!updated || updated.count === 0) {
+      return res.status(404).json({ error: 'Search not found' });
+    }
+
+    res.json({ id: searchId, notifyOnNewItems });
+  } catch (error) {
+    console.error('[searches] update notifications error', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/searches/:id - Get a specific saved search with full details including sort
 router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<any> => {
   try {
@@ -100,6 +132,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<any
       currency: search.currency,
       freeShipping: search.freeShipping,
       includeInFeed: search.includeInFeed,
+      notifyOnNewItems: search.notifyOnNewItems,
     });
   } catch (error) {
     console.error('[searches] get by id error', error);

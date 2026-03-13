@@ -12,6 +12,8 @@ export interface MatchResult {
   itemId: string;
   title: string;
   price: number;
+  itemWebUrl?: string; // URL to the eBay listing page
+  imageUrl?: string;  // Thumbnail image URL
   reason?: string; // Why this item is considered "new"
 }
 
@@ -77,6 +79,8 @@ export async function findNewItems(
       itemId: item.itemId,
       title: item.title,
       price,
+      itemWebUrl: item.itemWebUrl,
+      imageUrl: item.image?.imageUrl,
       reason: 'Item not in user wishlist',
     });
   }

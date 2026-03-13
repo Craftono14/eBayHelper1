@@ -9,6 +9,7 @@ interface SavedSearch {
   newResultsCount: number;
   isEbayImported: boolean;
   includeInFeed: boolean;
+  notifyOnNewItems: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +79,36 @@ export const SavedSearches: React.FC = () => {
     } catch (err) {
       setSearches(previous);
       setError(err instanceof Error ? err.message : 'Failed to update feed preference');
+    }
+  };
+
+  const handleNotificationsToggle = async (searchId: number, nextValue: boolean) => {
+    const token = localStorage.getItem('token');
+    const previous = searches;
+
+    setSearches((current) =>
+      current.map((search) =>
+        search.id === searchId ? { ...search, notifyOnNewItems: nextValue } : search
+      )
+    );
+
+    try {
+      const response = await fetch(`/api/searches/${searchId}/notifications`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ notifyOnNewItems: nextValue }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update notification preference');
+      }
+    } catch (err) {
+      setSearches(previous);
+      setError(err instanceof Error ? err.message : 'Failed to update notification preference');
     }
   };
 
@@ -250,6 +281,16 @@ export const SavedSearches: React.FC = () => {
                   className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                 />
                 Include in feed?
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+                <input
+                  type="checkbox"
+                  checked={search.notifyOnNewItems ?? false}
+                  onChange={(event) => handleNotificationsToggle(search.id, event.target.checked)}
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                Notifications?
               </label>
 
               <div className="mb-6 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-600">

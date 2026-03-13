@@ -134,6 +134,7 @@ router.post('/saved', async (req: Request, res: Response): Promise<void> => {
         returnsAccepted: returnsAccepted || false,
         authorizedSeller: authorizedSeller || false,
         searchInDescription: searchInDescription || false,
+        notifyOnNewItems: false,
         isActive: true,
       },
     });

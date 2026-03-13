@@ -83,3 +83,71 @@ export async function sendPriceAlertPushover(
     return { success: false, error: 'Unexpected error while sending Pushover notification' };
   }
 }
+
+interface PushoverNewItemPayload {
+  userKey: string;
+  title: string;
+  message: string;
+  url: string;
+  urlTitle: string;
+  imageUrl?: string | null;
+  device?: string | null;
+}
+
+export async function sendNewItemNotificationPushover(
+  payload: PushoverNewItemPayload
+): Promise<PushoverSendResult> {
+  if (!PUSHOVER_APP_TOKEN) {
+    return { success: false, error: 'PUSHOVER_APP_TOKEN is not configured on server' };
+  }
+
+  if (!payload.userKey) {
+    return { success: false, error: 'Pushover user key is missing' };
+  }
+
+  try {
+    const form = new FormData();
+    form.append('token', PUSHOVER_APP_TOKEN);
+    form.append('user', payload.userKey);
+    form.append('title', payload.title);
+    form.append('message', payload.message);
+    form.append('url', payload.url);
+    form.append('url_title', payload.urlTitle);
+
+    if (payload.device) {
+      form.append('device', payload.device);
+    }
+
+    if (payload.imageUrl) {
+      try {
+        const imageResponse = await fetch(payload.imageUrl);
+        if (imageResponse.ok) {
+          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+          if (contentType.startsWith('image/')) {
+            const imageBuffer = await imageResponse.arrayBuffer();
+            const imageBlob = new Blob([imageBuffer], { type: contentType });
+            const extension = extensionFromMimeType(contentType);
+            form.append('attachment', imageBlob, `item-image${extension}`);
+          }
+        }
+      } catch (imageError) {
+        console.warn('[Pushover] Failed to fetch item image for attachment. Sending without image.', imageError);
+      }
+    }
+
+    const response = await fetch(PUSHOVER_API_URL, {
+      method: 'POST',
+      body: form,
+    });
+
+    const bodyText = await response.text();
+    if (!response.ok) {
+      return { success: false, error: `Pushover API error (${response.status}): ${bodyText}` };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Pushover] Unexpected send error:', error);
+    return { success: false, error: 'Unexpected error while sending Pushover notification' };
+  }
+}

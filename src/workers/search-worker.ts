@@ -6,10 +6,12 @@
 import { PrismaClient } from '@prisma/client';
 import { createEbayBrowseService, EbayBrowseService } from '../services/ebay-browse.service';
 import { ebaySyncService } from '../services/ebaySync.service';
+import { sendNewItemNotificationPushover } from '../services/pushover-notification';
 import {
   findNewItems,
   saveNewItems,
   getSearchStatistics,
+  MatchResult,
   SearchComparisonResult,
 } from './item-matcher';
 
@@ -240,6 +242,11 @@ export class SearchWorker {
         await saveNewItems(this.prisma, search.userId, search.id, newItems);
       }
 
+      // Send Pushover notification if the search has notifications enabled and new items were found.
+      if (search.notifyOnNewItems && newItems.length > 0) {
+        await this.sendNewItemsNotification(search, newItems);
+      }
+
       // Update search run time
       await this.prisma.savedSearch.update({
         where: { id: search.id },
@@ -277,6 +284,64 @@ export class SearchWorker {
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * Send a Pushover notification when new items are found for a saved search.
+   * Single item: specific title/price/link. Multiple items: summary + eBay search link.
+   */
+  private async sendNewItemsNotification(
+    search: any,
+    newItems: MatchResult[]
+  ): Promise<void> {
+    const user = search.user;
+    const preference: string = user.notificationPreference || 'DISCORD';
+
+    if (preference !== 'PUSHOVER' || !user.pushoverUserKey) {
+      return;
+    }
+
+    const firstItem = newItems[0];
+    let title: string;
+    let message: string;
+    let url: string;
+    let urlTitle: string;
+    let imageUrl: string | undefined;
+
+    if (newItems.length === 1) {
+      const priceStr = `$${firstItem.price.toFixed(2)}`;
+      title = `New result for ${search.name}`;
+      message = `${priceStr} for ${firstItem.title}`;
+      url = firstItem.itemWebUrl || `https://www.ebay.com/itm/${firstItem.itemId}`;
+      urlTitle = 'Open eBay Item';
+      imageUrl = firstItem.imageUrl;
+    } else {
+      title = `New results for ${search.name}`;
+      message = `${newItems.length} new results found`;
+      url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(search.searchKeywords)}`;
+      urlTitle = 'View results on eBay';
+      imageUrl = firstItem.imageUrl;
+    }
+
+    const result = await sendNewItemNotificationPushover({
+      userKey: user.pushoverUserKey,
+      title,
+      message,
+      url,
+      urlTitle,
+      imageUrl: imageUrl || null,
+      device: user.pushoverDevice || null,
+    });
+
+    if (!result.success) {
+      console.warn(
+        `[searchWorker] Pushover notification failed for user ${user.id} / search "${search.name}": ${result.error}`
+      );
+    } else {
+      console.log(
+        `[searchWorker] Pushover notification sent for user ${user.id} / search "${search.name}" (${newItems.length} new item(s))`
+      );
     }
   }
 

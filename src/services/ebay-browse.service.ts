@@ -44,6 +44,7 @@ export interface EbayItem {
     imageUrl: string;
   };
   itemHref: string;
+  itemWebUrl?: string;  // Web URL to the eBay listing page
   buyingOptions: string[];
   shippingOptions?: Array<{
     shippingCost: {
