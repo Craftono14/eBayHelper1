@@ -315,6 +315,38 @@ export const Wishlist: React.FC = () => {
     }
   };
 
+  const handleDeleteAllNonImported = async () => {
+    const confirmed = window.confirm(
+      'Delete all non-imported listings from your wishlist? Imported eBay listings will be kept.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError('');
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/search/wishlist/non-imported/all', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove non-imported listings');
+      }
+
+      const data = await response.json();
+      setNotificationMessage(`Removed ${data.count} non-imported listing${data.count === 1 ? '' : 's'}`);
+      await fetchWishlist();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove non-imported listings');
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="text-center py-16">
@@ -345,6 +377,13 @@ export const Wishlist: React.FC = () => {
             className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition"
           >
             Remove All Alerts
+          </button>
+          <button
+            onClick={handleDeleteAllNonImported}
+            className="bg-gray-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition"
+            title="Delete all non-imported wishlist listings"
+          >
+            Delete Non-Imported
           </button>
 
           {/* Filter Tabs */}

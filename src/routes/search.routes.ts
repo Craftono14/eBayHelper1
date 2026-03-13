@@ -492,6 +492,31 @@ router.delete('/wishlist/:id', requireAuth, async (req: Request, res: Response):
   }
 });
 
+/**
+ * DELETE /api/search/wishlist/non-imported/all
+ * Remove all non-imported wishlist items for current user
+ */
+router.delete('/wishlist/non-imported/all', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+
+    const result = await prisma.wishlistItem.deleteMany({
+      where: {
+        userId,
+        isEbayImported: false,
+      },
+    });
+
+    res.json({
+      message: 'Non-imported listings removed',
+      count: result.count,
+    });
+  } catch (error) {
+    console.error('Failed to remove non-imported wishlist items:', error);
+    res.status(500).json({ error: 'Failed to remove non-imported listings' });
+  }
+});
+
 // ============================================================================
 // NOTIFICATIONS
 // ============================================================================
