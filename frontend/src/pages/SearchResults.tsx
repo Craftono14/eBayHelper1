@@ -62,6 +62,7 @@ export const SearchResults: React.FC = () => {
   
   const [searchName, setSearchName] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [savedSortBy, setSavedSortBy] = useState<string>('');
   const [sortParam, setSortParam] = useState<string>('');
   const [filterParam, setFilterParam] = useState<string>('');
   const [categoryIds, setCategoryIds] = useState<string>('');
@@ -87,7 +88,9 @@ export const SearchResults: React.FC = () => {
       // Date-based sorting
       'EndTime': 'endingSoonest',          // Items ending soon first
       'EndTimeSoonest': 'endingSoonest',   // Alias
+      'EndingSoonest': 'endingSoonest',    // Already-Browse variant
       'NewlyListed': 'newlyListed',        // Newly listed items first
+      'Newly Listed': 'newlyListed',       // Variant label form
       'RecentlyListed': 'newlyListed',     // Alias
       'StartDate': 'newlyListed',          // Start date (newly listed items)
       
@@ -119,6 +122,25 @@ export const SearchResults: React.FC = () => {
     // If not found in map, log warning and return empty (default to Best Match)
     console.warn('[SearchResults] Unknown eBay sort value:', savedSearchSort, '- defaulting to Best Match');
     return '';
+  };
+
+  // Normalize possible sort variants to canonical Browse API sort tokens.
+  const normalizeBrowseSort = (sortValue: string): string => {
+    const normalized = (sortValue || '').trim().toLowerCase().replace(/[\s_-]/g, '');
+
+    if (['newlylisted', 'recentlylisted', 'startdate'].includes(normalized)) {
+      return 'newlyListed';
+    }
+
+    if (['endingsoonest', 'endtimesoonest', 'endtime'].includes(normalized)) {
+      return 'endingSoonest';
+    }
+
+    if (['price', '-price'].includes(sortValue)) {
+      return sortValue;
+    }
+
+    return sortValue;
   };
 
   // Build Browse API filter string from saved search details
@@ -224,6 +246,7 @@ export const SearchResults: React.FC = () => {
         
         setSearchName('Temporary Search');
         setSearchQuery(tempSearch.searchKeywords || '');
+        setSavedSortBy(tempSearch.sortBy || '');
         
         // Build filter string from temporary search
         const filters: string[] = [];
@@ -340,6 +363,7 @@ export const SearchResults: React.FC = () => {
         
         setSearchName(search.name);
         setSearchQuery(search.searchKeywords);
+        setSavedSortBy(search.sortBy || '');
         
         // Map the sort preference to Browse API format
         const sortValue = mapSortToBrowseAPI(search.sortBy || null, search.sortOrder);
@@ -394,6 +418,7 @@ export const SearchResults: React.FC = () => {
             categories,
             searchQuery,
             sortParam,
+            savedSortBy,
             filterParam,
             limit,
             currentOffset
@@ -410,8 +435,9 @@ export const SearchResults: React.FC = () => {
         } else {
           // Single or no category: standard search
           let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${currentOffset}`;
-          if (sortParam) {
-            url += `&sort=${encodeURIComponent(sortParam)}`;
+          const effectiveSort = normalizeBrowseSort(sortParam || savedSortBy || '');
+          if (effectiveSort) {
+            url += `&sort=${encodeURIComponent(effectiveSort)}`;
           }
           if (filterParam) {
             url += `&filter=${encodeURIComponent(filterParam)}`;
@@ -430,7 +456,7 @@ export const SearchResults: React.FC = () => {
             total: data.total,
             offset: data.offset,
             limit: data.limit,
-            appliedSort: sortParam,
+            appliedSort: effectiveSort,
             appliedFilter: filterParam,
             appliedCategories: categoryIds,
           });
@@ -447,17 +473,20 @@ export const SearchResults: React.FC = () => {
     };
 
     fetchItems();
-  }, [searchQuery, currentOffset, limit, sortParam, filterParam, categoryIds]);
+  }, [searchQuery, currentOffset, limit, sortParam, savedSortBy, filterParam, categoryIds]);
 
   // Perform multi-category search and combine results
   const performMultiCategorySearch = async (
     categories: string[],
     searchQuery: string,
     sortParam: string,
+    rawSortBy: string,
     filterParam: string,
     limit: number,
     offset: number
   ): Promise<{ items: ItemSummary[]; total: number }> => {
+    const effectiveSort = normalizeBrowseSort(sortParam || rawSortBy || '');
+
     const getListingTimestamp = (item: ItemSummary): number => {
       const dateValue = item.itemOriginDate || item.itemCreationDate || '';
       if (!dateValue) return 0;
@@ -475,8 +504,8 @@ export const SearchResults: React.FC = () => {
     // Perform parallel searches for each category
     const searchPromises = categories.map(async (categoryId) => {
       let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${offset}`;
-      if (sortParam) {
-        url += `&sort=${encodeURIComponent(sortParam)}`;
+      if (effectiveSort) {
+        url += `&sort=${encodeURIComponent(effectiveSort)}`;
       }
       if (filterParam) {
         url += `&filter=${encodeURIComponent(filterParam)}`;
@@ -503,7 +532,7 @@ export const SearchResults: React.FC = () => {
     let combinedItems: ItemSummary[] = [];
     
     // Check if using Best Match sort (no sort param or default)
-    const isBestMatch = !sortParam || sortParam === '';
+    const isBestMatch = !effectiveSort || effectiveSort === '';
     
     if (isBestMatch) {
       // Mix results proportionally for Best Match
@@ -559,7 +588,7 @@ export const SearchResults: React.FC = () => {
       }
       
       // Re-sort combined results based on sort parameter
-      if (sortParam === 'newlyListed') {
+      if (effectiveSort === 'newlyListed') {
         allItems.sort((a, b) => {
           const tsDiff = getListingTimestamp(b) - getListingTimestamp(a);
           if (tsDiff !== 0) return tsDiff;
@@ -571,7 +600,7 @@ export const SearchResults: React.FC = () => {
 
           return (aOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER) - (bOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER);
         });
-      } else if (sortParam === 'endingSoonest') {
+      } else if (effectiveSort === 'endingSoonest') {
         allItems.sort((a, b) => {
           const tsDiff = getEndingTimestamp(a) - getEndingTimestamp(b);
           if (tsDiff !== 0) return tsDiff;
@@ -583,11 +612,11 @@ export const SearchResults: React.FC = () => {
 
           return (aOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER) - (bOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER);
         });
-      } else if (sortParam === 'price' || sortParam === '-price') {
+      } else if (effectiveSort === 'price' || effectiveSort === '-price') {
         allItems.sort((a, b) => {
           const priceA = parseFloat(a.price?.value || a.currentBidPrice?.value || '0');
           const priceB = parseFloat(b.price?.value || b.currentBidPrice?.value || '0');
-          return sortParam === 'price' ? priceA - priceB : priceB - priceA;
+          return effectiveSort === 'price' ? priceA - priceB : priceB - priceA;
         });
       }
       
