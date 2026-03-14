@@ -704,9 +704,10 @@ export class SearchWorker {
     newItems: MatchResult[]
   ): Promise<void> {
     const user = search.user;
-    const preference: string = user.notificationPreference || 'DISCORD';
-
-    if (preference !== 'PUSHOVER' || !user.pushoverUserKey) {
+    if (!user.pushoverUserKey) {
+      console.log(
+        `[searchWorker] Skipping saved-search notification for user ${user.id} / search "${search.name}" because no Pushover key is configured`
+      );
       return;
     }
 
