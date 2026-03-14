@@ -15,7 +15,7 @@ import {
   MatchResult,
   SearchComparisonResult,
 } from './item-matcher';
-import { createPublicResultsToken } from '../utils/public-results-token';
+import { createPublicResultsSnapshot } from '../utils/public-results-store';
 
 export interface WorkerConfig {
   accessToken: string;
@@ -771,7 +771,7 @@ export class SearchWorker {
       urlTitle = 'Open eBay Item';
       imageUrl = firstItem.imageUrl;
     } else {
-      const token = createPublicResultsToken({
+      const snapshotId = await createPublicResultsSnapshot(this.prisma, {
         searchName: search.name,
         items: newItems.map((item) => ({
           itemId: item.itemId,
@@ -784,7 +784,7 @@ export class SearchWorker {
 
       title = `New results for ${search.name}`;
       message = `${newItems.length} new results found`;
-      url = `${this.getPublicBaseUrl()}/public/new-results/${token}`;
+      url = `${this.getPublicBaseUrl()}/public/new-results/${snapshotId}`;
       urlTitle = 'View new results';
       imageUrl = firstItem.imageUrl;
     }

@@ -262,3 +262,15 @@ model EbayAccountDeletion {
   @@index([processedAt])
   @@map("ebay_account_deletions")
 }
+
+// PublicResultsSnapshot model - stores shareable multi-item notification snapshots
+model PublicResultsSnapshot {
+  id                      String         @id // Short URL-safe snapshot ID
+  searchName              String
+  items                   Json           // Array of PublicResultItem objects
+  createdAt               DateTime       @default(now())
+  expiresAt               DateTime
+
+  @@index([expiresAt])
+  @@map("public_results_snapshots")
+}

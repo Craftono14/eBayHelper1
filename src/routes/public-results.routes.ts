@@ -1,12 +1,29 @@
 import { Router, Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { verifyPublicResultsToken } from '../utils/public-results-token';
+import { getPublicResultsSnapshot } from '../utils/public-results-store';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 // GET /api/public/new-results/:token - Public endpoint for shareable multi-item notification links
-router.get('/new-results/:token', (req: Request, res: Response): void => {
+router.get('/new-results/:token', async (req: Request, res: Response): Promise<void> => {
+  const token = req.params.token;
+
+  // Preferred path: short in-memory snapshot IDs for Pushover-safe URL length.
+  const snapshot = await getPublicResultsSnapshot(prisma, token);
+  if (snapshot) {
+    res.json({
+      searchName: snapshot.searchName,
+      items: snapshot.items,
+      createdAt: snapshot.createdAt.toISOString(),
+      expiresAt: snapshot.expiresAt.toISOString(),
+    });
+    return;
+  }
+
+  // Backward compatibility: old signed token links.
   try {
-    const token = req.params.token;
     const payload = verifyPublicResultsToken(token);
 
     res.json({
