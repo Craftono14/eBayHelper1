@@ -357,7 +357,9 @@ export class SearchWorker {
         searchName: search.name,
         totalResultsFound: totalFound,
         newItemsFound: newItems,
-        scannedPreviewTitles: allItems.slice(0, 5).map((item) => item.title),
+        scannedPreviewTitles: search.notifyOnNewItems
+          ? allItems.slice(0, 5).map((item) => item.title)
+          : [],
         itemsChecked: allItems.length,
         processingTimeMs,
       };
