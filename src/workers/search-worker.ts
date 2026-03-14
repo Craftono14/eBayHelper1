@@ -22,6 +22,7 @@ export interface WorkerConfig {
   delayBetweenRequestsMs?: number;
   maxSearchesPerRun?: number;
   autoAddSearchResultsToWishlist?: boolean;
+  previousScanItemIdsBySearch?: Map<number, Set<string>>;
 }
 
 export interface WorkerStats {
@@ -79,7 +80,7 @@ export class SearchWorker {
     try {
       // Fetch all active searches
       const searches = await this.prisma.savedSearch.findMany({
-        where: { isActive: true, notifyOnNewItems: true },
+        where: { isActive: true },
         include: { user: true },
         take: this.config.maxSearchesPerRun,
       });
@@ -295,8 +296,8 @@ export class SearchWorker {
         `[searchWorker] Searching: "${search.searchKeywords}" — filter: "${filterString || 'none'}", categories: "${categoryIds || 'any'}", sort: ${sort}`
       );
 
-      // Find new items by comparing with existing wishlist
-      const newItems = await findNewItems(
+      // Find items not already in wishlist (used for optional auto-add behavior).
+      const wishlistNewItems = await findNewItems(
         this.prisma,
         search.userId,
         search.id,
@@ -305,10 +306,31 @@ export class SearchWorker {
         search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined
       );
 
+      // Detect newly seen items by comparing this scan with the previous scan snapshot.
+      // This prevents sending repeated notifications for unchanged result sets.
+      const currentScanItemIds = new Set(allItems.map((item) => item.itemId));
+      const previousScanItemIds = this.config.previousScanItemIdsBySearch?.get(search.id);
+
+      let newItems: MatchResult[] = [];
+      if (previousScanItemIds) {
+        const unseenItems = allItems.filter((item) => !previousScanItemIds.has(item.itemId));
+        newItems = this.mapItemsToMatchResults(
+          unseenItems,
+          search.minPrice ? parseFloat(search.minPrice.toString()) : undefined,
+          search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined
+        );
+      } else {
+        console.log(`[searchWorker] First scan baseline for search ${search.id}; notifications suppressed until next run`);
+      }
+
+      if (this.config.previousScanItemIdsBySearch) {
+        this.config.previousScanItemIdsBySearch.set(search.id, currentScanItemIds);
+      }
+
       // Optional behavior: only auto-add search results if explicitly enabled.
       // Default is false to prevent feed/discovery results from flooding wishlist.
-      if (this.config.autoAddSearchResultsToWishlist && newItems.length > 0) {
-        await saveNewItems(this.prisma, search.userId, search.id, newItems);
+      if (this.config.autoAddSearchResultsToWishlist && wishlistNewItems.length > 0) {
+        await saveNewItems(this.prisma, search.userId, search.id, wishlistNewItems);
       }
 
       // Send Pushover notification if the search has notifications enabled and new items were found.
@@ -448,6 +470,44 @@ export class SearchWorker {
     }
 
     return filters.join(',');
+  }
+
+  /**
+   * Convert raw Browse API items into MatchResult objects and apply optional price filters.
+   */
+  private mapItemsToMatchResults(
+    items: EbayItem[],
+    minPrice?: number,
+    maxPrice?: number
+  ): MatchResult[] {
+    const mapped: MatchResult[] = [];
+
+    for (const item of items) {
+      const price = parseFloat(item.price?.value || '0');
+      if (Number.isNaN(price) || price <= 0) {
+        continue;
+      }
+
+      if (minPrice !== undefined && price < minPrice) {
+        continue;
+      }
+
+      if (maxPrice !== undefined && price > maxPrice) {
+        continue;
+      }
+
+      mapped.push({
+        isNew: true,
+        itemId: item.itemId,
+        title: item.title,
+        price,
+        itemWebUrl: item.itemWebUrl,
+        imageUrl: item.image?.imageUrl,
+        reason: 'Item not present in previous scan snapshot',
+      });
+    }
+
+    return mapped;
   }
 
   /**

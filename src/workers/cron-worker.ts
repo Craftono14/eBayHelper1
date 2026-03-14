@@ -40,6 +40,7 @@ export class CronWorkerManager {
   private running = false;
   private lastRunTime: Date | null = null;
   private lastDuration = 0;
+  private previousScanItemIdsBySearch: Map<number, Set<string>> = new Map();
 
   constructor(prisma: PrismaClient, config: CronWorkerConfig) {
     this.prisma = prisma;
@@ -114,6 +115,7 @@ export class CronWorkerManager {
         delayBetweenRequestsMs: 500,
         maxSearchesPerRun: 50,
         autoAddSearchResultsToWishlist: this.config.autoAddSearchResultsToWishlist || false,
+        previousScanItemIdsBySearch: this.previousScanItemIdsBySearch,
       });
 
       const stats = await searchWorker.runSearchCycle();
