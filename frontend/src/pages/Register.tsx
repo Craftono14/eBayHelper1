@@ -6,6 +6,7 @@ export const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [registrationKey, setRegistrationKey] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -25,10 +26,15 @@ export const Register: React.FC = () => {
       return;
     }
 
+    if (!registrationKey.trim()) {
+      setError('Registration Key is required');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await register(email, password);
+      await register(email, password, registrationKey);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -52,6 +58,18 @@ export const Register: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-600"
             placeholder="you@example.com"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700 font-medium mb-2">Registration Key</label>
+          <input
+            type="text"
+            value={registrationKey}
+            onChange={(e) => setRegistrationKey(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-600"
+            placeholder="Enter registration key"
             required
           />
         </div>

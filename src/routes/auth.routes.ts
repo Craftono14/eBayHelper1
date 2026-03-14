@@ -13,6 +13,7 @@ const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '10', 10);
 interface RegisterBody {
   email: string;
   password: string;
+  registrationKey: string;
   username?: string;
 }
 
@@ -29,8 +30,17 @@ function signToken(payload: object) {
 router.post('/register', async (req: Request, res: Response): Promise<any> => {
   try {
     const body = req.body as RegisterBody;
-    if (!body.email || !body.password) {
-      return res.status(400).json({ error: 'email and password are required' });
+    if (!body.email || !body.password || !body.registrationKey) {
+      return res.status(400).json({ error: 'email, password, and registrationKey are required' });
+    }
+
+    const serverRegisterKey = (process.env.REGISTER_KEY || '').trim();
+    if (!serverRegisterKey) {
+      return res.status(503).json({ error: 'Registration is currently disabled' });
+    }
+
+    if (body.registrationKey.trim() !== serverRegisterKey) {
+      return res.status(403).json({ error: 'Invalid registration key' });
     }
 
     const existing = await (prisma.user as any).findUnique({ where: { email: body.email } });
