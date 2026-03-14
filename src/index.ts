@@ -17,6 +17,7 @@ import ebaySyncRoutes from './routes/ebay-sync.routes';
 import ebayAccountDeletionRoutes from './routes/ebay-account-deletion.routes';
 import syncRoutes from './routes/sync.routes';
 import usersRoutes from './routes/users.routes';
+import publicResultsRoutes from './routes/public-results.routes';
 import { initializeWorkers } from './workers/express-integration';
 import { createPriceMonitoringRouter } from './routes/prices.routes';
 import { requireAuth } from './middleware/auth.middleware';
@@ -182,6 +183,9 @@ app.use('/api/sync', syncRoutes);
 
 // Users routes
 app.use('/api/users', usersRoutes);
+
+// Public shareable notification-result routes (no auth required)
+app.use('/api/public', publicResultsRoutes);
 
 // Price monitoring routes (mounted here to preserve middleware order before 404 handler)
 app.use('/api/prices', requireAuth, (req: Request, res: Response, next: NextFunction): void => {

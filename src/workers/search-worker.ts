@@ -15,6 +15,7 @@ import {
   MatchResult,
   SearchComparisonResult,
 } from './item-matcher';
+import { createPublicResultsToken } from '../utils/public-results-token';
 
 export interface WorkerConfig {
   accessToken: string;
@@ -59,6 +60,7 @@ export class SearchWorker {
   private service: EbayBrowseService;
   private config: WorkerConfig;
   private appAccessTokenCache: { token: string; expiresAt: number } | null = null;
+  private notifiedSearchIdsThisCycle: Set<number> = new Set();
   private stats: WorkerStats = {
     totalSearches: 0,
     completedSearches: 0,
@@ -93,11 +95,12 @@ export class SearchWorker {
   async runSearchCycle(): Promise<WorkerStats> {
     const startTime = Date.now();
     console.log('[searchWorker] Starting search cycle...');
+    this.notifiedSearchIdsThisCycle.clear();
 
     try {
       // Fetch all active searches
       const searches = await this.prisma.savedSearch.findMany({
-        where: { isActive: true },
+        where: { isActive: true, notifyOnNewItems: true },
         include: { user: true },
         take: this.config.maxSearchesPerRun,
       });
@@ -416,7 +419,14 @@ export class SearchWorker {
 
       // Send Pushover notification if the search has notifications enabled and new items were found.
       if (search.notifyOnNewItems && newItems.length > 0) {
-        await this.sendNewItemsNotification(search, newItems);
+        if (!this.notifiedSearchIdsThisCycle.has(search.id)) {
+          this.notifiedSearchIdsThisCycle.add(search.id);
+          await this.sendNewItemsNotification(search, newItems);
+        } else {
+          console.log(
+            `[searchWorker] Skipping duplicate notification for search ${search.id} in current cycle`
+          );
+        }
       }
 
       // Update search run time
@@ -693,10 +703,21 @@ export class SearchWorker {
       urlTitle = 'Open eBay Item';
       imageUrl = firstItem.imageUrl;
     } else {
+      const token = createPublicResultsToken({
+        searchName: search.name,
+        items: newItems.map((item) => ({
+          itemId: item.itemId,
+          title: item.title,
+          price: item.price,
+          itemWebUrl: item.itemWebUrl,
+          imageUrl: item.imageUrl,
+        })),
+      });
+
       title = `New results for ${search.name}`;
       message = `${newItems.length} new results found`;
-      url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(search.searchKeywords)}`;
-      urlTitle = 'View results on eBay';
+      url = `${this.getPublicBaseUrl()}/public/new-results/${token}`;
+      urlTitle = 'View new results';
       imageUrl = firstItem.imageUrl;
     }
 

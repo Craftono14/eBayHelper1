@@ -12,6 +12,7 @@ import { Register } from './pages/Register';
 import { LinkEbay } from './pages/LinkEbay';
 import { Tests } from './pages/Tests';
 import { Settings } from './pages/Settings';
+import { PublicNewResults } from './pages/PublicNewResults';
 import EbayCallback from './pages/EbayCallback';
 import './App.css';
 
@@ -34,6 +35,7 @@ function App() {
             <Route path="/tests" element={<Tests />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/ebay-callback" element={<EbayCallback />} />
+            <Route path="/public/new-results/:token" element={<PublicNewResults />} />
           </Routes>
         </Layout>
       </AuthProvider>
