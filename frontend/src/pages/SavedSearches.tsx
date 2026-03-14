@@ -22,6 +22,7 @@ interface WorkerSearchDebug {
   totalResultsFound: number;
   itemsChecked: number;
   newItemsFound: number;
+  missingPriceCount: number;
   previewTitles: string[];
   error?: string;
 }
@@ -320,7 +321,7 @@ export const SavedSearches: React.FC = () => {
                       {row.searchName} (ID: {row.searchId})
                     </p>
                     <p>
-                      status={row.status}, notifyOnNewItems={String(row.notifyOnNewItems)}, results={row.totalResultsFound}, checked={row.itemsChecked}, new={row.newItemsFound}
+                      status={row.status}, notifyOnNewItems={String(row.notifyOnNewItems)}, results={row.totalResultsFound}, checked={row.itemsChecked}, new={row.newItemsFound}, missingPrice={row.missingPriceCount}
                     </p>
                     {row.error && <p className="text-red-700">error: {row.error}</p>}
                     {row.previewTitles.length > 0 && (

@@ -46,6 +46,7 @@ export interface WorkerSearchDebug {
   totalResultsFound: number;
   itemsChecked: number;
   newItemsFound: number;
+  missingPriceCount: number;
   previewTitles: string[];
   error?: string;
 }
@@ -163,6 +164,7 @@ export class SearchWorker {
             totalResultsFound: result.value.totalResultsFound,
             itemsChecked: result.value.itemsChecked,
             newItemsFound: result.value.newItemsFound.length,
+            missingPriceCount: result.value.missingPriceCount,
             previewTitles: result.value.scannedPreviewTitles.slice(0, 5),
           });
         } else {
@@ -180,6 +182,7 @@ export class SearchWorker {
             totalResultsFound: 0,
             itemsChecked: 0,
             newItemsFound: 0,
+            missingPriceCount: 0,
             previewTitles: [],
             error: errorMessage,
           });
@@ -402,6 +405,7 @@ export class SearchWorker {
         scannedPreviewTitles: search.notifyOnNewItems
           ? allItems.slice(0, 5).map((item) => item.title)
           : [],
+        missingPriceCount: allItems.filter((item) => !item.price?.value && !item.currentBidPrice?.value).length,
         itemsChecked: allItems.length,
         processingTimeMs,
       };

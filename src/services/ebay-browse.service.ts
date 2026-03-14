@@ -31,6 +31,10 @@ export interface EbayItem {
     value: string;
     currency: string;
   };
+  currentBidPrice?: {
+    value: string;
+    currency: string;
+  };
   condition: string;
   conditionId: string;
   seller: {

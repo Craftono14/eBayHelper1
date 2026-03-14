@@ -23,6 +23,7 @@ export interface SearchComparisonResult {
   totalResultsFound: number;
   newItemsFound: MatchResult[];
   scannedPreviewTitles: string[];
+  missingPriceCount: number;
   itemsChecked: number;
   processingTimeMs: number;
 }
@@ -64,7 +65,14 @@ export async function findNewItems(
       continue;
     }
 
-    const price = parseFloat(item.price.value);
+    const rawPrice = item.price?.value || item.currentBidPrice?.value;
+    if (!rawPrice) {
+      continue;
+    }
+    const price = parseFloat(rawPrice);
+    if (Number.isNaN(price)) {
+      continue;
+    }
 
     // Apply price filters if specified
     if (priceMinimum !== undefined && price < priceMinimum) {
@@ -160,7 +168,14 @@ export async function recordPriceHistory(
   items: EbayItem[]
 ): Promise<void> {
   for (const item of items) {
-    const price = parseFloat(item.price.value);
+    const rawPrice = item.price?.value || item.currentBidPrice?.value;
+    if (!rawPrice) {
+      continue;
+    }
+    const price = parseFloat(rawPrice);
+    if (Number.isNaN(price)) {
+      continue;
+    }
 
     // Get the previous price to detect drops
     const previousHistory = await prisma.itemHistory.findFirst({
