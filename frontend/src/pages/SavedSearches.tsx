@@ -23,6 +23,8 @@ export const SavedSearches: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [deleteMessage, setDeleteMessage] = useState('');
+  const [triggeringWorker, setTriggeringWorker] = useState(false);
+  const [workerMessage, setWorkerMessage] = useState('');
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -112,6 +114,35 @@ export const SavedSearches: React.FC = () => {
     }
   };
 
+  const handleTriggerWorker = async () => {
+    try {
+      setTriggeringWorker(true);
+      setWorkerMessage('');
+      setError('');
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/workers/trigger', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to trigger worker');
+      }
+
+      setWorkerMessage(data.message || 'Search check triggered successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to trigger worker');
+    } finally {
+      setTriggeringWorker(false);
+    }
+  };
+
   const handleSyncWithEbay = async () => {
     try {
       setSyncing(true);
@@ -198,24 +229,50 @@ export const SavedSearches: React.FC = () => {
     <div>
       <div className="mb-8 flex justify-between items-center">
         <h1 className="text-3xl font-bold">Saved Searches</h1>
-        <button
-          onClick={handleSyncWithEbay}
-          disabled={syncing}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {syncing ? (
-            <>
-              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Syncing...
-            </>
-          ) : (
-            'Sync with eBay'
-          )}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleTriggerWorker}
+            disabled={triggeringWorker}
+            title="Manually run the saved search notification check"
+            className="bg-gray-700 text-white px-4 py-2 rounded-lg font-bold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {triggeringWorker ? (
+              <>
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Running...
+              </>
+            ) : (
+              'Run Search Check'
+            )}
+          </button>
+          <button
+            onClick={handleSyncWithEbay}
+            disabled={syncing}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {syncing ? (
+              <>
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Syncing...
+              </>
+            ) : (
+              'Sync with eBay'
+            )}
+          </button>
+        </div>
       </div>
+
+      {workerMessage && (
+        <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
+          {workerMessage}
+        </div>
+      )}
 
       {syncMessage && (
         <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
