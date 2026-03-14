@@ -222,16 +222,25 @@ export class SearchWorker {
       // Build filter string (matches frontend SearchResults.buildFilterString exactly)
       const filterString = this.buildFilterString(search);
 
-      // Parse category IDs from JSON array stored in DB (e.g. '["11450","625"]')
+      // Parse category IDs from DB. Supports JSON arrays and plain comma-delimited strings.
       let categoryIds: string | undefined;
       if (search.categories) {
         try {
-          const cats: string[] = JSON.parse(search.categories);
-          if (Array.isArray(cats) && cats.length > 0) {
-            categoryIds = cats.join(',');
+          const parsed = JSON.parse(search.categories);
+          if (Array.isArray(parsed)) {
+            const cats = parsed.map((c) => String(c).trim()).filter(Boolean);
+            if (cats.length > 0) {
+              categoryIds = cats.join(',');
+            }
           }
         } catch {
-          // ignore malformed category JSON
+          const fallback = String(search.categories)
+            .split(',')
+            .map((c: string) => c.trim())
+            .filter(Boolean);
+          if (fallback.length > 0) {
+            categoryIds = fallback.join(',');
+          }
         }
       }
 
@@ -349,8 +358,12 @@ export class SearchWorker {
     const filters: string[] = [];
 
     // Price filters
-    const minPrice = search.minPrice ? parseFloat(search.minPrice.toString()) : null;
-    const maxPrice = search.maxPrice ? parseFloat(search.maxPrice.toString()) : null;
+    const minPrice = search.minPrice !== null && search.minPrice !== undefined
+      ? parseFloat(search.minPrice.toString())
+      : null;
+    const maxPrice = search.maxPrice !== null && search.maxPrice !== undefined
+      ? parseFloat(search.maxPrice.toString())
+      : null;
     const hasPriceFilter = minPrice !== null || maxPrice !== null;
 
     if (minPrice !== null && maxPrice !== null) {
@@ -416,6 +429,15 @@ export class SearchWorker {
       } else if (search.itemLocation === 'Worldwide') {
         filters.push('itemLocationRegion:WORLDWIDE');
       }
+    }
+
+    // Keep parity with SearchResults page behavior for price+shipping sort variants.
+    if (
+      search.sortBy === 'PricePlusShipping' ||
+      search.sortBy === 'PricePlusShippingLowest' ||
+      search.sortBy === 'PricePlusShippingHighest'
+    ) {
+      filters.push('deliveryPostalCode:80011');
     }
 
     return filters.join(',');
