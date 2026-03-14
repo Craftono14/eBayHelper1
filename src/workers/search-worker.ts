@@ -4,6 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
 import { createEbayBrowseService, EbayBrowseService, EbayItem } from '../services/ebay-browse.service';
 import { ebaySyncService } from '../services/ebaySync.service';
 import { sendNewItemNotificationPushover } from '../services/pushover-notification';
@@ -43,6 +44,7 @@ export class SearchWorker {
   private prisma: PrismaClient;
   private service: EbayBrowseService;
   private config: WorkerConfig;
+  private appAccessTokenCache: { token: string; expiresAt: number } | null = null;
   private stats: WorkerStats = {
     totalSearches: 0,
     completedSearches: 0,
@@ -218,13 +220,9 @@ export class SearchWorker {
     console.log(`[searchWorker] Processing search: "${search.name}" (ID: ${search.id})`);
 
     try {
-      // Verify user has valid OAuth token
-      if (!search.user?.ebayAccessToken) {
-        throw new Error(`User ${search.userId} has no eBay OAuth token`);
-      }
-
-      // Update service token for this user
-      this.service.updateAccessToken(search.user.ebayAccessToken);
+      // Use user token when available; otherwise fallback to app token (same auth model as View Items).
+      const accessToken = await this.getAccessTokenForSearch(search);
+      this.service.updateAccessToken(accessToken);
 
       // Build filter string (matches frontend SearchResults.buildFilterString exactly)
       const filterString = this.buildFilterString(search);
@@ -379,6 +377,61 @@ export class SearchWorker {
 
       throw error;
     }
+  }
+
+  /**
+   * Resolve an access token for Browse API calls.
+   * Prioritizes user token when available, otherwise falls back to app token.
+   */
+  private async getAccessTokenForSearch(search: any): Promise<string> {
+    if (search.user?.ebayAccessToken) {
+      return search.user.ebayAccessToken;
+    }
+
+    return this.getAppAccessToken();
+  }
+
+  /**
+   * Get (and cache) an eBay app token via client-credentials flow.
+   */
+  private async getAppAccessToken(): Promise<string> {
+    const now = Date.now();
+    if (this.appAccessTokenCache && this.appAccessTokenCache.expiresAt > now + 60_000) {
+      return this.appAccessTokenCache.token;
+    }
+
+    const clientId = process.env.EBAY_CLIENT_ID;
+    const clientSecret = process.env.EBAY_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      throw new Error('Missing EBAY_CLIENT_ID or EBAY_CLIENT_SECRET for app-token fallback');
+    }
+
+    const tokenUrl = this.config.sandbox
+      ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
+      : 'https://api.ebay.com/identity/v1/oauth2/token';
+
+    const body = new URLSearchParams({
+      grant_type: 'client_credentials',
+      scope: 'https://api.ebay.com/oauth/api_scope',
+    });
+
+    const response = await axios.post(tokenUrl, body.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      },
+    });
+
+    const token: string = response.data.access_token;
+    const expiresIn: number = Number(response.data.expires_in || 7200);
+
+    this.appAccessTokenCache = {
+      token,
+      expiresAt: now + expiresIn * 1000,
+    };
+
+    return token;
   }
 
   /**
