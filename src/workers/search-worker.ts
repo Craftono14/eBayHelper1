@@ -674,6 +674,28 @@ export class SearchWorker {
   }
 
   /**
+   * Resolve a public app base URL for absolute, shareable notification links.
+   */
+  private getPublicBaseUrl(): string {
+    const explicit = process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL;
+    if (explicit) {
+      return explicit.replace(/\/$/, '');
+    }
+
+    const postAuthRedirect = process.env.EBAY_CLIENT_POST_AUTH_REDIRECT;
+    if (postAuthRedirect) {
+      try {
+        const parsed = new URL(postAuthRedirect);
+        return `${parsed.protocol}//${parsed.host}`;
+      } catch {
+        // Ignore malformed URL and continue with fallback
+      }
+    }
+
+    return 'http://localhost:5173';
+  }
+
+  /**
    * Send a Pushover notification when new items are found for a saved search.
    * Single item: specific title/price/link. Multiple items: summary + eBay search link.
    */
