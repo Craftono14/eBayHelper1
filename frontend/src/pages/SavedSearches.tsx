@@ -19,6 +19,8 @@ interface WorkerSearchDebug {
   searchName: string;
   notifyOnNewItems: boolean;
   status: 'success' | 'failed';
+  notificationStatus?: 'sent' | 'skipped' | 'failed';
+  notificationError?: string;
   totalResultsFound: number;
   itemsChecked: number;
   newItemsFound: number;
@@ -40,6 +42,8 @@ export const SavedSearches: React.FC = () => {
   const [workerMessage, setWorkerMessage] = useState('');
   const [workerPreviewTitles, setWorkerPreviewTitles] = useState<string[]>([]);
   const [workerDebug, setWorkerDebug] = useState<WorkerSearchDebug[]>([]);
+  const [testingPushover, setTestingPushover] = useState(false);
+  const [pushoverTestMessage, setPushoverTestMessage] = useState('');
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -212,6 +216,34 @@ export const SavedSearches: React.FC = () => {
     }
   };
 
+  const handleTestPushover = async () => {
+    try {
+      setTestingPushover(true);
+      setPushoverTestMessage('');
+      setError('');
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users/pushover-settings/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send test Pushover notification');
+      }
+
+      setPushoverTestMessage(data.message || 'Test Pushover notification sent successfully.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send test Pushover notification');
+    } finally {
+      setTestingPushover(false);
+    }
+  };
+
   const handleDeleteSearch = async (searchId: number) => {
     const confirmDelete = window.confirm('Delete this saved search? This action cannot be undone.');
     if (!confirmDelete) {
@@ -259,6 +291,24 @@ export const SavedSearches: React.FC = () => {
       <div className="mb-8 flex justify-between items-center">
         <h1 className="text-3xl font-bold">Saved Searches</h1>
         <div className="flex gap-2">
+          <button
+            onClick={handleTestPushover}
+            disabled={testingPushover}
+            title="Send a basic Pushover test notification"
+            className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {testingPushover ? (
+              <>
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Sending Test...
+              </>
+            ) : (
+              'Test Pushover'
+            )}
+          </button>
           <button
             onClick={handleTriggerWorker}
             disabled={triggeringWorker}
@@ -321,8 +371,9 @@ export const SavedSearches: React.FC = () => {
                       {row.searchName} (ID: {row.searchId})
                     </p>
                     <p>
-                      status={row.status}, notifyOnNewItems={String(row.notifyOnNewItems)}, results={row.totalResultsFound}, checked={row.itemsChecked}, new={row.newItemsFound}, missingPrice={row.missingPriceCount}
+                      status={row.status}, notifyOnNewItems={String(row.notifyOnNewItems)}, notification={row.notificationStatus || 'n/a'}, results={row.totalResultsFound}, checked={row.itemsChecked}, new={row.newItemsFound}, missingPrice={row.missingPriceCount}
                     </p>
+                    {row.notificationError && <p className="text-amber-700">notification: {row.notificationError}</p>}
                     {row.error && <p className="text-red-700">error: {row.error}</p>}
                     {row.previewTitles.length > 0 && (
                       <p>preview: {row.previewTitles.slice(0, 3).join(' | ')}</p>
@@ -332,6 +383,12 @@ export const SavedSearches: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {pushoverTestMessage && (
+        <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
+          {pushoverTestMessage}
         </div>
       )}
 

@@ -44,6 +44,8 @@ export interface WorkerSearchDebug {
   searchName: string;
   notifyOnNewItems: boolean;
   status: 'success' | 'failed';
+  notificationStatus?: 'sent' | 'skipped' | 'failed';
+  notificationError?: string;
   totalResultsFound: number;
   itemsChecked: number;
   newItemsFound: number;
@@ -164,6 +166,8 @@ export class SearchWorker {
             searchName: result.value.searchName,
             notifyOnNewItems: Boolean(search?.notifyOnNewItems),
             status: 'success',
+            notificationStatus: result.value.notificationStatus,
+            notificationError: result.value.notificationError,
             totalResultsFound: result.value.totalResultsFound,
             itemsChecked: result.value.itemsChecked,
             newItemsFound: result.value.newItemsFound.length,
@@ -396,6 +400,8 @@ export class SearchWorker {
       const previousScanItemIds = this.config.previousScanItemIdsBySearch?.get(search.id);
 
       let newItems: MatchResult[] = [];
+      let notificationStatus: 'sent' | 'skipped' | 'failed' | undefined;
+      let notificationError: string | undefined;
       if (previousScanItemIds) {
         const unseenItems = allItems.filter((item) => !previousScanItemIds.has(item.itemId));
         newItems = this.mapItemsToMatchResults(
@@ -421,12 +427,21 @@ export class SearchWorker {
       if (search.notifyOnNewItems && newItems.length > 0) {
         if (!this.notifiedSearchIdsThisCycle.has(search.id)) {
           this.notifiedSearchIdsThisCycle.add(search.id);
-          await this.sendNewItemsNotification(search, newItems);
+          const notificationResult = await this.sendNewItemsNotification(search, newItems);
+          notificationStatus = notificationResult.status;
+          notificationError = notificationResult.error;
         } else {
+          notificationStatus = 'skipped';
+          notificationError = 'Duplicate notification prevented within current cycle';
           console.log(
             `[searchWorker] Skipping duplicate notification for search ${search.id} in current cycle`
           );
         }
+      } else if (search.notifyOnNewItems) {
+        notificationStatus = 'skipped';
+        notificationError = newItems.length === 0
+          ? 'No newly detected items compared to previous scan'
+          : undefined;
       }
 
       // Update search run time
@@ -452,6 +467,8 @@ export class SearchWorker {
           ? allItems.slice(0, 5).map((item) => item.title)
           : [],
         missingPriceCount: allItems.filter((item) => !item.price?.value && !item.currentBidPrice?.value).length,
+        notificationStatus,
+        notificationError,
         itemsChecked: allItems.length,
         processingTimeMs,
       };
@@ -702,13 +719,14 @@ export class SearchWorker {
   private async sendNewItemsNotification(
     search: any,
     newItems: MatchResult[]
-  ): Promise<void> {
+  ): Promise<{ status: 'sent' | 'skipped' | 'failed'; error?: string }> {
     const user = search.user;
     if (!user.pushoverUserKey) {
+      const error = 'No Pushover user key configured';
       console.log(
-        `[searchWorker] Skipping saved-search notification for user ${user.id} / search "${search.name}" because no Pushover key is configured`
+        `[searchWorker] Skipping saved-search notification for user ${user.id} / search "${search.name}" because ${error.toLowerCase()}`
       );
-      return;
+      return { status: 'skipped', error };
     }
 
     const firstItem = newItems[0];
@@ -758,10 +776,12 @@ export class SearchWorker {
       console.warn(
         `[searchWorker] Pushover notification failed for user ${user.id} / search "${search.name}": ${result.error}`
       );
+      return { status: 'failed', error: result.error };
     } else {
       console.log(
         `[searchWorker] Pushover notification sent for user ${user.id} / search "${search.name}" (${newItems.length} new item(s))`
       );
+      return { status: 'sent' };
     }
   }
 

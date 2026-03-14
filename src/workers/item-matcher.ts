@@ -24,6 +24,8 @@ export interface SearchComparisonResult {
   newItemsFound: MatchResult[];
   scannedPreviewTitles: string[];
   missingPriceCount: number;
+  notificationStatus?: 'sent' | 'skipped' | 'failed';
+  notificationError?: string;
   itemsChecked: number;
   processingTimeMs: number;
 }
