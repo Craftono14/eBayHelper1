@@ -398,18 +398,45 @@ export class SearchWorker {
       // This prevents sending repeated notifications for unchanged result sets.
       const currentScanItemIds = new Set(allItems.map((item) => item.itemId));
       const previousScanItemIds = this.config.previousScanItemIdsBySearch?.get(search.id);
+      const previousRunTimestamp = search.lastRunAt
+        ? Date.parse(new Date(search.lastRunAt).toISOString())
+        : 0;
 
       let newItems: MatchResult[] = [];
       let notificationStatus: 'sent' | 'skipped' | 'failed' | undefined;
       let notificationError: string | undefined;
-      if (previousScanItemIds) {
-        const unseenItems = allItems.filter((item) => !previousScanItemIds.has(item.itemId));
-        newItems = this.mapItemsToMatchResults(
-          unseenItems,
-          search.minPrice ? parseFloat(search.minPrice.toString()) : undefined,
-          search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined
-        );
-      } else {
+
+      // Signal 1: item IDs not seen in the previous in-memory snapshot.
+      const unseenItems = previousScanItemIds
+        ? allItems.filter((item) => !previousScanItemIds.has(item.itemId))
+        : [];
+
+      // Signal 2: items that appear to have been listed after the previous run time.
+      // This helps after restarts or when snapshot cache is stale/missing.
+      const listedAfterLastRunItems = previousRunTimestamp > 0
+        ? allItems.filter((item) => this.getListingTimestamp(item) > previousRunTimestamp)
+        : [];
+
+      const unseenMatchResults = this.mapItemsToMatchResults(
+        unseenItems,
+        search.minPrice ? parseFloat(search.minPrice.toString()) : undefined,
+        search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined
+      );
+
+      const listedAfterLastRunMatchResults = this.mapItemsToMatchResults(
+        listedAfterLastRunItems,
+        search.minPrice ? parseFloat(search.minPrice.toString()) : undefined,
+        search.maxPrice ? parseFloat(search.maxPrice.toString()) : undefined
+      );
+
+      // Union both signals by item ID.
+      const mergedById = new Map<string, MatchResult>();
+      for (const item of [...unseenMatchResults, ...listedAfterLastRunMatchResults]) {
+        mergedById.set(item.itemId, item);
+      }
+      newItems = Array.from(mergedById.values());
+
+      if (!previousScanItemIds && previousRunTimestamp === 0) {
         console.log(`[searchWorker] First scan baseline for search ${search.id}; notifications suppressed until next run`);
       }
 
