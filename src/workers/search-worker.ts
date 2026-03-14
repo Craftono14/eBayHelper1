@@ -220,8 +220,8 @@ export class SearchWorker {
     console.log(`[searchWorker] Processing search: "${search.name}" (ID: ${search.id})`);
 
     try {
-      // Use user token when available; otherwise fallback to app token (same auth model as View Items).
-      const accessToken = await this.getAccessTokenForSearch(search);
+      // Use app token for saved-search scanning to match View Items auth behavior exactly.
+      const accessToken = await this.getAppAccessToken();
       this.service.updateAccessToken(accessToken);
 
       // Build filter string (matches frontend SearchResults.buildFilterString exactly)
@@ -377,18 +377,6 @@ export class SearchWorker {
 
       throw error;
     }
-  }
-
-  /**
-   * Resolve an access token for Browse API calls.
-   * Prioritizes user token when available, otherwise falls back to app token.
-   */
-  private async getAccessTokenForSearch(search: any): Promise<string> {
-    if (search.user?.ebayAccessToken) {
-      return search.user.ebayAccessToken;
-    }
-
-    return this.getAppAccessToken();
   }
 
   /**
