@@ -538,7 +538,18 @@ export const SearchResults: React.FC = () => {
     } else {
       // For other sorts, combine all results then re-sort
       const allItems: ItemSummary[] = [];
-      for (const result of results) {
+      const fallbackOrder = new Map<string, { rank: number; categoryOrder: number }>();
+
+      results.forEach((result, categoryOrder) => {
+        result.items.forEach((item, rank) => {
+          if (!fallbackOrder.has(item.itemId)) {
+            fallbackOrder.set(item.itemId, { rank, categoryOrder });
+          }
+        });
+      });
+
+      for (let categoryOrder = 0; categoryOrder < results.length; categoryOrder++) {
+        const result = results[categoryOrder];
         for (const item of result.items) {
           if (!seenIds.has(item.itemId)) {
             seenIds.add(item.itemId);
@@ -549,9 +560,29 @@ export const SearchResults: React.FC = () => {
       
       // Re-sort combined results based on sort parameter
       if (sortParam === 'newlyListed') {
-        allItems.sort((a, b) => getListingTimestamp(b) - getListingTimestamp(a));
+        allItems.sort((a, b) => {
+          const tsDiff = getListingTimestamp(b) - getListingTimestamp(a);
+          if (tsDiff !== 0) return tsDiff;
+
+          const aOrder = fallbackOrder.get(a.itemId);
+          const bOrder = fallbackOrder.get(b.itemId);
+          const rankDiff = (aOrder?.rank ?? Number.MAX_SAFE_INTEGER) - (bOrder?.rank ?? Number.MAX_SAFE_INTEGER);
+          if (rankDiff !== 0) return rankDiff;
+
+          return (aOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER) - (bOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER);
+        });
       } else if (sortParam === 'endingSoonest') {
-        allItems.sort((a, b) => getEndingTimestamp(a) - getEndingTimestamp(b));
+        allItems.sort((a, b) => {
+          const tsDiff = getEndingTimestamp(a) - getEndingTimestamp(b);
+          if (tsDiff !== 0) return tsDiff;
+
+          const aOrder = fallbackOrder.get(a.itemId);
+          const bOrder = fallbackOrder.get(b.itemId);
+          const rankDiff = (aOrder?.rank ?? Number.MAX_SAFE_INTEGER) - (bOrder?.rank ?? Number.MAX_SAFE_INTEGER);
+          if (rankDiff !== 0) return rankDiff;
+
+          return (aOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER) - (bOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER);
+        });
       } else if (sortParam === 'price' || sortParam === '-price') {
         allItems.sort((a, b) => {
           const priceA = parseFloat(a.price?.value || a.currentBidPrice?.value || '0');

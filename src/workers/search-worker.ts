@@ -314,12 +314,20 @@ export class SearchWorker {
         // Multi-category: search each category separately, then deduplicate
         const catList = categoryIds.split(',').map((c: string) => c.trim()).filter(Boolean);
         const seenIds = new Set<string>();
+        const fallbackOrder = new Map<string, { rank: number; categoryOrder: number }>();
         allItems = [];
         totalFound = 0;
 
-        for (const catId of catList) {
+        for (let categoryOrder = 0; categoryOrder < catList.length; categoryOrder++) {
+          const catId = catList[categoryOrder];
           const result = await this.service.searchItems({ ...baseOptions, categoryIds: catId });
           totalFound += result.total || 0;
+          (result.itemSummaries || []).forEach((item, rank) => {
+            if (!fallbackOrder.has(item.itemId)) {
+              fallbackOrder.set(item.itemId, { rank, categoryOrder });
+            }
+          });
+
           for (const item of result.itemSummaries || []) {
             if (!seenIds.has(item.itemId)) {
               seenIds.add(item.itemId);
@@ -330,10 +338,30 @@ export class SearchWorker {
 
         // After combining multi-category results, enforce a global sort order.
         if (sort === 'endingSoonest') {
-          allItems.sort((a, b) => this.getEndingTimestamp(a) - this.getEndingTimestamp(b));
+          allItems.sort((a, b) => {
+            const tsDiff = this.getEndingTimestamp(a) - this.getEndingTimestamp(b);
+            if (tsDiff !== 0) return tsDiff;
+
+            const aOrder = fallbackOrder.get(a.itemId);
+            const bOrder = fallbackOrder.get(b.itemId);
+            const rankDiff = (aOrder?.rank ?? Number.MAX_SAFE_INTEGER) - (bOrder?.rank ?? Number.MAX_SAFE_INTEGER);
+            if (rankDiff !== 0) return rankDiff;
+
+            return (aOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER) - (bOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER);
+          });
         } else {
           // Default path: newest first.
-          allItems.sort((a, b) => this.getListingTimestamp(b) - this.getListingTimestamp(a));
+          allItems.sort((a, b) => {
+            const tsDiff = this.getListingTimestamp(b) - this.getListingTimestamp(a);
+            if (tsDiff !== 0) return tsDiff;
+
+            const aOrder = fallbackOrder.get(a.itemId);
+            const bOrder = fallbackOrder.get(b.itemId);
+            const rankDiff = (aOrder?.rank ?? Number.MAX_SAFE_INTEGER) - (bOrder?.rank ?? Number.MAX_SAFE_INTEGER);
+            if (rankDiff !== 0) return rankDiff;
+
+            return (aOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER) - (bOrder?.categoryOrder ?? Number.MAX_SAFE_INTEGER);
+          });
         }
       } else {
         // Single category or no category
