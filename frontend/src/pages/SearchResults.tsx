@@ -24,6 +24,9 @@ interface ItemSummary {
     };
   }>;
   itemWebUrl?: string;
+  itemOriginDate?: string;
+  itemCreationDate?: string;
+  itemEndDate?: string;
 }
 
 interface SearchResponse {
@@ -455,6 +458,20 @@ export const SearchResults: React.FC = () => {
     limit: number,
     offset: number
   ): Promise<{ items: ItemSummary[]; total: number }> => {
+    const getListingTimestamp = (item: ItemSummary): number => {
+      const dateValue = item.itemOriginDate || item.itemCreationDate || '';
+      if (!dateValue) return 0;
+      const ts = Date.parse(dateValue);
+      return Number.isNaN(ts) ? 0 : ts;
+    };
+
+    const getEndingTimestamp = (item: ItemSummary): number => {
+      const dateValue = item.itemEndDate || '';
+      if (!dateValue) return Number.MAX_SAFE_INTEGER;
+      const ts = Date.parse(dateValue);
+      return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
+    };
+
     // Perform parallel searches for each category
     const searchPromises = categories.map(async (categoryId) => {
       let url = `/api/browse/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}&offset=${offset}`;
@@ -531,7 +548,11 @@ export const SearchResults: React.FC = () => {
       }
       
       // Re-sort combined results based on sort parameter
-      if (sortParam === 'price' || sortParam === '-price') {
+      if (sortParam === 'newlyListed') {
+        allItems.sort((a, b) => getListingTimestamp(b) - getListingTimestamp(a));
+      } else if (sortParam === 'endingSoonest') {
+        allItems.sort((a, b) => getEndingTimestamp(a) - getEndingTimestamp(b));
+      } else if (sortParam === 'price' || sortParam === '-price') {
         allItems.sort((a, b) => {
           const priceA = parseFloat(a.price?.value || a.currentBidPrice?.value || '0');
           const priceB = parseFloat(b.price?.value || b.currentBidPrice?.value || '0');

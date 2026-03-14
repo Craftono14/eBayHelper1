@@ -327,6 +327,14 @@ export class SearchWorker {
             }
           }
         }
+
+        // After combining multi-category results, enforce a global sort order.
+        if (sort === 'endingSoonest') {
+          allItems.sort((a, b) => this.getEndingTimestamp(a) - this.getEndingTimestamp(b));
+        } else {
+          // Default path: newest first.
+          allItems.sort((a, b) => this.getListingTimestamp(b) - this.getListingTimestamp(a));
+        }
       } else {
         // Single category or no category
         const result = await this.service.searchItems({
@@ -599,6 +607,32 @@ export class SearchWorker {
     }
 
     return mapped;
+  }
+
+  /**
+   * Safely parse listing timestamp for newest-first sorting.
+   */
+  private getListingTimestamp(item: EbayItem): number {
+    const dateValue = item.itemOriginDate || item.itemCreationDate || '';
+    if (!dateValue) {
+      return 0;
+    }
+
+    const ts = Date.parse(String(dateValue));
+    return Number.isNaN(ts) ? 0 : ts;
+  }
+
+  /**
+   * Safely parse listing end timestamp for ending-soonest sorting.
+   */
+  private getEndingTimestamp(item: EbayItem): number {
+    const dateValue = item.itemEndDate || '';
+    if (!dateValue) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+
+    const ts = Date.parse(String(dateValue));
+    return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
   }
 
   /**

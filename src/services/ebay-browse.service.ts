@@ -51,6 +51,9 @@ export interface EbayItem {
   };
   itemHref: string;
   itemWebUrl?: string;  // Web URL to the eBay listing page
+  itemOriginDate?: string;
+  itemCreationDate?: string;
+  itemEndDate?: string;
   buyingOptions: string[];
   shippingOptions?: Array<{
     shippingCost: {

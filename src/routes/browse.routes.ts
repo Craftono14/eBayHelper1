@@ -142,6 +142,9 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
         buyingOptions: item.buyingOptions || [],
         shippingOptions: item.shippingOptions,
         itemWebUrl: item.itemWebUrl,
+        itemOriginDate: item.itemOriginDate,
+        itemCreationDate: item.itemCreationDate,
+        itemEndDate: item.itemEndDate,
       };
       
       // Debug log first few items to see structure
