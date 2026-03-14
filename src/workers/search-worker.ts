@@ -32,6 +32,7 @@ export interface WorkerStats {
   totalItemsProcessed: number;
   rateLimitHits: number;
   durationMs: number;
+  scannedPreviewTitles: string[];
 }
 
 /**
@@ -49,6 +50,7 @@ export class SearchWorker {
     totalItemsProcessed: 0,
     rateLimitHits: 0,
     durationMs: 0,
+    scannedPreviewTitles: [],
   };
 
   constructor(prisma: PrismaClient, config: WorkerConfig) {
@@ -90,6 +92,10 @@ export class SearchWorker {
 
       this.stats.newItemsFound = results.reduce((sum, r) => sum + r.newItemsFound.length, 0);
       this.stats.totalItemsProcessed = results.reduce((sum, r) => sum + r.totalResultsFound, 0);
+      this.stats.scannedPreviewTitles = results
+        .flatMap((r) => r.scannedPreviewTitles)
+        .filter((title) => title.trim().length > 0)
+        .slice(0, 5);
 
       await this.syncWatchlistsForPriceAlerts();
 
@@ -329,6 +335,7 @@ export class SearchWorker {
         searchName: search.name,
         totalResultsFound: totalFound,
         newItemsFound: newItems,
+        scannedPreviewTitles: allItems.slice(0, 5).map((item) => item.title),
         itemsChecked: allItems.length,
         processingTimeMs,
       };
@@ -516,6 +523,13 @@ export class SearchWorker {
   }
 
   /**
+   * Get up to five titles from the newest-listed items scanned in the most recent cycle.
+   */
+  getScannedPreviewTitles(): string[] {
+    return [...this.stats.scannedPreviewTitles];
+  }
+
+  /**
    * Reset statistics for next run
    */
   resetStats(): void {
@@ -527,6 +541,7 @@ export class SearchWorker {
       totalItemsProcessed: 0,
       rateLimitHits: 0,
       durationMs: 0,
+      scannedPreviewTitles: [],
     };
   }
 }

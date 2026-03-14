@@ -22,6 +22,7 @@ export interface SearchComparisonResult {
   searchName: string;
   totalResultsFound: number;
   newItemsFound: MatchResult[];
+  scannedPreviewTitles: string[];
   itemsChecked: number;
   processingTimeMs: number;
 }

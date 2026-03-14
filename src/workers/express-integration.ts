@@ -176,10 +176,12 @@ export async function initializeWorkers(
    */
   router.post('/trigger', async (_req, res) => {
     try {
-      await cronWorker.triggerNow();
+      const summary = await cronWorker.triggerNow();
       return res.json({
         success: true,
         message: 'Search cycle triggered',
+        scannedPreviewTitles: summary?.scannedPreviewTitles || [],
+        stats: summary?.stats || null,
       });
     } catch (error) {
       return res.status(500).json({ error: (error as Error).message });

@@ -25,6 +25,7 @@ export const SavedSearches: React.FC = () => {
   const [deleteMessage, setDeleteMessage] = useState('');
   const [triggeringWorker, setTriggeringWorker] = useState(false);
   const [workerMessage, setWorkerMessage] = useState('');
+  const [workerPreviewTitles, setWorkerPreviewTitles] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -118,6 +119,7 @@ export const SavedSearches: React.FC = () => {
     try {
       setTriggeringWorker(true);
       setWorkerMessage('');
+      setWorkerPreviewTitles([]);
       setError('');
 
       const token = localStorage.getItem('token');
@@ -136,7 +138,13 @@ export const SavedSearches: React.FC = () => {
       }
 
       setWorkerMessage(data.message || 'Search check triggered successfully');
+      setWorkerPreviewTitles(
+        Array.isArray(data.scannedPreviewTitles)
+          ? data.scannedPreviewTitles.slice(0, 5)
+          : []
+      );
     } catch (err) {
+      setWorkerPreviewTitles([]);
       setError(err instanceof Error ? err.message : 'Failed to trigger worker');
     } finally {
       setTriggeringWorker(false);
@@ -270,7 +278,17 @@ export const SavedSearches: React.FC = () => {
 
       {workerMessage && (
         <div className="bg-green-100 text-green-700 p-4 rounded-lg mb-6">
-          {workerMessage}
+          <p className="font-semibold">{workerMessage}</p>
+          {workerPreviewTitles.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm font-medium">Newest listings scanned:</p>
+              <ul className="list-disc pl-6 text-sm mt-1">
+                {workerPreviewTitles.map((title, index) => (
+                  <li key={`${index}-${title}`}>{title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

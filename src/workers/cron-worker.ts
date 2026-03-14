@@ -15,7 +15,7 @@
 
 import cron, { ScheduledTask } from 'node-cron';
 import { PrismaClient } from '@prisma/client';
-import { createSearchWorker } from './search-worker';
+import { createSearchWorker, WorkerStats } from './search-worker';
 
 export interface CronWorkerConfig {
   accessToken: string;
@@ -23,6 +23,11 @@ export interface CronWorkerConfig {
   cronSchedule: string; // Cron expression (e.g., "*/5 * * * *" for every 5 minutes)
   enabled: boolean;
   autoAddSearchResultsToWishlist?: boolean;
+}
+
+export interface TriggerSearchSummary {
+  stats: WorkerStats;
+  scannedPreviewTitles: string[];
 }
 
 /**
@@ -89,10 +94,10 @@ export class CronWorkerManager {
   /**
    * Execute a search cycle
    */
-  private async executeSearch(): Promise<void> {
+  private async executeSearch(): Promise<TriggerSearchSummary | null> {
     if (this.running) {
       console.warn('[cron] Search already in progress');
-      return;
+      return null;
     }
 
     this.running = true;
@@ -112,6 +117,7 @@ export class CronWorkerManager {
       });
 
       const stats = await searchWorker.runSearchCycle();
+      const scannedPreviewTitles = searchWorker.getScannedPreviewTitles();
       this.lastDuration = Date.now() - startTime;
 
       console.log('[cron] Search cycle completed:', {
@@ -122,9 +128,15 @@ export class CronWorkerManager {
         totalItems: stats.totalItemsProcessed,
         durationMs: stats.durationMs,
       });
+
+      return {
+        stats,
+        scannedPreviewTitles,
+      };
     } catch (error) {
       this.lastDuration = Date.now() - startTime;
       console.error('[cron] Error during search cycle:', error);
+      return null;
     } finally {
       this.running = false;
     }
@@ -133,14 +145,14 @@ export class CronWorkerManager {
   /**
    * Manually trigger a search right now
    */
-  async triggerNow(): Promise<void> {
+  async triggerNow(): Promise<TriggerSearchSummary | null> {
     if (this.running) {
       console.warn('[cron] Search cycle already running');
-      return;
+      return null;
     }
 
     console.log('[cron] Manually triggering search cycle...');
-    await this.executeSearch();
+    return this.executeSearch();
   }
 
   /**
