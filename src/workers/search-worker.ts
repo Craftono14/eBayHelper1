@@ -297,7 +297,7 @@ export class SearchWorker {
       }
 
       // Always sort by newly listed so the worker detects freshly posted items
-      const sort = 'newlyListed';
+      const sort: string = 'newlyListed';
 
       const baseOptions = {
         keywords: search.searchKeywords,
