@@ -35,6 +35,19 @@ export interface WorkerStats {
   rateLimitHits: number;
   durationMs: number;
   scannedPreviewTitles: string[];
+  searchDebug: WorkerSearchDebug[];
+}
+
+export interface WorkerSearchDebug {
+  searchId: number;
+  searchName: string;
+  notifyOnNewItems: boolean;
+  status: 'success' | 'failed';
+  totalResultsFound: number;
+  itemsChecked: number;
+  newItemsFound: number;
+  previewTitles: string[];
+  error?: string;
 }
 
 /**
@@ -54,6 +67,7 @@ export class SearchWorker {
     rateLimitHits: 0,
     durationMs: 0,
     scannedPreviewTitles: [],
+    searchDebug: [],
   };
 
   constructor(prisma: PrismaClient, config: WorkerConfig) {
@@ -91,7 +105,7 @@ export class SearchWorker {
       console.log(`[searchWorker] Found ${searches.length} active searches`);
 
       // Process searches with batching and rate limit awareness
-      const results = await this.processSearchesBatch(searches);
+      const { results, debug } = await this.processSearchesBatch(searches);
 
       this.stats.newItemsFound = results.reduce((sum, r) => sum + r.newItemsFound.length, 0);
       this.stats.totalItemsProcessed = results.reduce((sum, r) => sum + r.totalResultsFound, 0);
@@ -99,6 +113,7 @@ export class SearchWorker {
         .flatMap((r) => r.scannedPreviewTitles)
         .filter((title) => title.trim().length > 0)
         .slice(0, 5);
+      this.stats.searchDebug = debug;
 
       await this.syncWatchlistsForPriceAlerts();
 
@@ -118,8 +133,9 @@ export class SearchWorker {
    */
   private async processSearchesBatch(
     searches: any[]
-  ): Promise<SearchComparisonResult[]> {
+  ): Promise<{ results: SearchComparisonResult[]; debug: WorkerSearchDebug[] }> {
     const results: SearchComparisonResult[] = [];
+    const debug: WorkerSearchDebug[] = [];
     const batchSize = this.config.maxConcurrentRequests || 3;
 
     for (let i = 0; i < searches.length; i += batchSize) {
@@ -135,13 +151,41 @@ export class SearchWorker {
 
       for (let j = 0; j < batchResults.length; j++) {
         const result = batchResults[j];
+        const search = batch[j];
         if (result.status === 'fulfilled') {
           results.push(result.value);
           this.stats.completedSearches++;
+          debug.push({
+            searchId: result.value.searchId,
+            searchName: result.value.searchName,
+            notifyOnNewItems: Boolean(search?.notifyOnNewItems),
+            status: 'success',
+            totalResultsFound: result.value.totalResultsFound,
+            itemsChecked: result.value.itemsChecked,
+            newItemsFound: result.value.newItemsFound.length,
+            previewTitles: result.value.scannedPreviewTitles.slice(0, 5),
+          });
         } else {
           this.stats.failedSearches++;
+          const errorMessage =
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason || 'Unknown error');
+
+          debug.push({
+            searchId: Number(search?.id || 0),
+            searchName: search?.name || 'Unknown search',
+            notifyOnNewItems: Boolean(search?.notifyOnNewItems),
+            status: 'failed',
+            totalResultsFound: 0,
+            itemsChecked: 0,
+            newItemsFound: 0,
+            previewTitles: [],
+            error: errorMessage,
+          });
+
           console.error(
-            `[searchWorker] Search failed: ${result.reason?.message || result.reason}`
+            `[searchWorker] Search failed: ${errorMessage}`
           );
         }
       }
@@ -153,7 +197,7 @@ export class SearchWorker {
       }
     }
 
-    return results;
+    return { results, debug };
   }
 
   /**
@@ -645,6 +689,7 @@ export class SearchWorker {
       rateLimitHits: 0,
       durationMs: 0,
       scannedPreviewTitles: [],
+      searchDebug: [],
     };
   }
 }

@@ -14,6 +14,18 @@ interface SavedSearch {
   updatedAt: string;
 }
 
+interface WorkerSearchDebug {
+  searchId: number;
+  searchName: string;
+  notifyOnNewItems: boolean;
+  status: 'success' | 'failed';
+  totalResultsFound: number;
+  itemsChecked: number;
+  newItemsFound: number;
+  previewTitles: string[];
+  error?: string;
+}
+
 export const SavedSearches: React.FC = () => {
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
@@ -26,6 +38,7 @@ export const SavedSearches: React.FC = () => {
   const [triggeringWorker, setTriggeringWorker] = useState(false);
   const [workerMessage, setWorkerMessage] = useState('');
   const [workerPreviewTitles, setWorkerPreviewTitles] = useState<string[]>([]);
+  const [workerDebug, setWorkerDebug] = useState<WorkerSearchDebug[]>([]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -120,6 +133,7 @@ export const SavedSearches: React.FC = () => {
       setTriggeringWorker(true);
       setWorkerMessage('');
       setWorkerPreviewTitles([]);
+      setWorkerDebug([]);
       setError('');
 
       const token = localStorage.getItem('token');
@@ -143,8 +157,14 @@ export const SavedSearches: React.FC = () => {
           ? data.scannedPreviewTitles.slice(0, 5)
           : []
       );
+      setWorkerDebug(
+        Array.isArray(data?.stats?.searchDebug)
+          ? data.stats.searchDebug
+          : []
+      );
     } catch (err) {
       setWorkerPreviewTitles([]);
+      setWorkerDebug([]);
       setError(err instanceof Error ? err.message : 'Failed to trigger worker');
     } finally {
       setTriggeringWorker(false);
@@ -287,6 +307,28 @@ export const SavedSearches: React.FC = () => {
                   <li key={`${index}-${title}`}>{title}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {workerDebug.length > 0 && (
+            <div className="mt-4 border-t border-green-300 pt-3">
+              <p className="text-sm font-medium mb-2">Worker Debug</p>
+              <div className="space-y-2 text-xs">
+                {workerDebug.map((row) => (
+                  <div key={`${row.searchId}-${row.searchName}`} className="bg-white/60 rounded p-2">
+                    <p className="font-semibold">
+                      {row.searchName} (ID: {row.searchId})
+                    </p>
+                    <p>
+                      status={row.status}, notifyOnNewItems={String(row.notifyOnNewItems)}, results={row.totalResultsFound}, checked={row.itemsChecked}, new={row.newItemsFound}
+                    </p>
+                    {row.error && <p className="text-red-700">error: {row.error}</p>}
+                    {row.previewTitles.length > 0 && (
+                      <p>preview: {row.previewTitles.slice(0, 3).join(' | ')}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
